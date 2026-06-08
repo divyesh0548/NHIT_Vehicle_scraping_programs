@@ -1,0 +1,17 @@
+.env
+__pycache__/
+*.pyc
+_ihmcl_tmp_input.xlsx
+_ihmcl_tmp_output.xlsx
+*.xlsx
+*.xls
+*.csv
+*.rar
+*.zip
+*.7z
+*.cache
+*.tmp
+*.temp
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

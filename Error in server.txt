@@ -1,0 +1,15 @@
+Clicking on plaza dropdown to select 'Phulwaria Toll Plaza'...
+Successfully selected 'Phulwaria Toll Plaza'!
+Waiting for captcha image...
+Downloading captcha image...
+Extracting captcha text using OCR...
+Error solving captcha: Tensor on device meta is not on the expected device cpu!
+Traceback (most recent call last):
+  File "C:\Divyesh95\NHIT Vehicle Processing\IHMCL_bot.py", line 406, in solve_captcha
+    extracted_text_list = extract_text(captcha_array)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Divyesh95\NHIT Vehicle Processing\ocr_module.py", line 107, in extract_text
+    extracted_text = tr_ocr_image_from_array(cropped_image)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Divyesh95\NHIT Vehicle Processing\ocr_module.py", line 21, in tr_ocr_image_from_array
+    generated_ids = model.generate(pixel_values)
