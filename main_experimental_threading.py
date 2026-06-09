@@ -254,12 +254,20 @@ def parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=None):
     return df
 
 
+def _run_local_vehicle_web_scrape(vehicle_df, skip_db_phases=True):
+    """Single local Chrome session (default scraper path)."""
+    print("  [WEB SCRAPE] Running local Chrome (single browser)...", flush=True)
+    return scrape_vehicle_weights_chhattisgarh(vehicle_df, skip_db_phases=skip_db_phases)
+
+
 def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
     """
-    Chhattisgarh web scrape after DB prefetch. Uses Selenium Grid when selenium_processing is True.
+    Chhattisgarh web scrape after DB prefetch.
+    When selenium_processing is True, tries Selenium Grid first; on any grid error,
+    falls back to local Chrome on the prefetched dataframe (or partial grid results).
     """
     if not selenium_processing:
-        return scrape_vehicle_weights_chhattisgarh(vehicle_df, skip_db_phases=skip_db_phases)
+        return _run_local_vehicle_web_scrape(vehicle_df, skip_db_phases=skip_db_phases)
 
     chunks = split_df_for_grid(vehicle_df, MAX_SELENIUM_GRID_NODES)
     if not chunks:
@@ -270,7 +278,11 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
         f"(auto_nodes={SELENIUM_AUTO_MANAGE_NODES})",
         flush=True,
     )
+
     managed_nodes = []
+    merged = None
+    grid_error = None
+
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
             managed_nodes = start_managed_nodes(len(chunks))
@@ -294,30 +306,41 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
                 chunk_id = future_to_chunk[future]
                 try:
                     result_frames.append(future.result())
-                    print(f"  [SELENIUM GRID] Chunk {chunk_id}/{len(chunks)} completed", flush=True)
+                    print(
+                        f"  [SELENIUM GRID] Chunk {chunk_id}/{len(chunks)} completed",
+                        flush=True,
+                    )
                 except Exception as exc:
                     failures.append((chunk_id, exc))
                     print(f"  [SELENIUM GRID] Chunk {chunk_id} failed: {exc}", flush=True)
 
-        if not result_frames:
-            raise RuntimeError(f"All Selenium Grid chunks failed: {failures}")
+        if result_frames:
+            merged = vehicle_df.copy()
+            for frame in result_frames:
+                for col in frame.columns:
+                    merged.loc[frame.index, col] = frame[col]
 
-        # Overlay successful chunk results onto prefetched vehicle_df so failed chunks
-        # still keep DB-prefetch weights and S3 output row count stays complete.
-        merged = vehicle_df.copy()
-        for frame in result_frames:
-            for col in frame.columns:
-                merged.loc[frame.index, col] = frame[col]
-        if failures:
-            print(
-                f"  [WARNING] {len(failures)} Selenium Grid chunk(s) failed; "
-                f"those rows keep DB-prefetch values only",
-                flush=True,
-            )
-        return merged
+        if not result_frames:
+            grid_error = f"All Selenium Grid chunks failed: {failures}"
+        elif failures:
+            grid_error = f"{len(failures)} Selenium Grid chunk(s) failed: {failures}"
+
+    except Exception as exc:
+        grid_error = str(exc)
+        print(f"  [SELENIUM GRID] Error: {exc}", flush=True)
     finally:
         if managed_nodes:
             stop_managed_nodes(managed_nodes)
+
+    if grid_error:
+        print(
+            "  [SELENIUM GRID] Falling back to local Chrome web scraping...",
+            flush=True,
+        )
+        df_for_local = merged if merged is not None else vehicle_df
+        return _run_local_vehicle_web_scrape(df_for_local, skip_db_phases=skip_db_phases)
+
+    return merged
 
 
 def get_db_connection():
