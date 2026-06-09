@@ -1,3 +1,4 @@
+import threading
 import time
 import pandas as pd
 from selenium import webdriver
@@ -16,6 +17,10 @@ from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_n
 URL = "https://parivahan.gov.in/"
 WAIT_TIME = 30
 ELEMENT_WAIT = 15
+
+_thread_remote_url = threading.local()
+
+
 def get_db_connection():
     """Create and return a PostgreSQL database connection"""
     try:
@@ -71,7 +76,9 @@ def check_and_restore_db_connection(conn):
         print(f"[DB-ERROR] Error checking connection: {e}")
         return conn
 
-def setup_driver():
+def setup_driver(remote_url=None):
+    if remote_url is None:
+        remote_url = getattr(_thread_remote_url, "value", None)
     try:
         options = webdriver.ChromeOptions()
         
@@ -104,26 +111,30 @@ def setup_driver():
             "profile.default_content_settings.popups": 0
         }
         options.add_experimental_option("prefs", prefs)
-        
-        # Try to create driver with service
-        try:
-            # First try with default service
-            driver = webdriver.Chrome(options=options)
-        except Exception as e1:
-            print(f"  [WARN] First attempt failed: {e1}")
-            print("  [INFO] Retrying with explicit service configuration...")
+
+        if remote_url:
+            from IHMCL_bot_selenium import ensure_grid_ready
+
+            ensure_grid_ready(remote_url)
+            driver = webdriver.Remote(command_executor=remote_url, options=options)
+            print(f"Browser connected to Selenium Grid: {remote_url}")
+        else:
+            # Try to create local driver with service
             try:
-                # Try with explicit service (handles ChromeDriver path issues)
-                service = Service()
-                driver = webdriver.Chrome(service=service, options=options)
-            except Exception as e2:
-                print(f"  [WARN] Second attempt failed: {e2}")
-                print("  [INFO] Retrying with minimal options...")
-                # Last resort: minimal options
-                minimal_options = webdriver.ChromeOptions()
-                minimal_options.add_argument('--no-sandbox')
-                minimal_options.add_argument('--disable-dev-shm-usage')
-                driver = webdriver.Chrome(options=minimal_options)
+                driver = webdriver.Chrome(options=options)
+            except Exception as e1:
+                print(f"  [WARN] First attempt failed: {e1}")
+                print("  [INFO] Retrying with explicit service configuration...")
+                try:
+                    service = Service()
+                    driver = webdriver.Chrome(service=service, options=options)
+                except Exception as e2:
+                    print(f"  [WARN] Second attempt failed: {e2}")
+                    print("  [INFO] Retrying with minimal options...")
+                    minimal_options = webdriver.ChromeOptions()
+                    minimal_options.add_argument('--no-sandbox')
+                    minimal_options.add_argument('--disable-dev-shm-usage')
+                    driver = webdriver.Chrome(options=minimal_options)
         
         try:
             driver.maximize_window()
@@ -698,7 +709,7 @@ def check_vehicle_in_database(cursor, vehicle_no, table_name):
         print(f"[DB-ERROR] Error checking {table_name} for {vehicle_no}: {e}")
         return None
 
-def scrape_vehicle_weights_chhattisgarh(df_input, skip_db_phases=False):
+def scrape_vehicle_weights_chhattisgarh(df_input, skip_db_phases=False, remote_url=None):
     """
     Vehicle weight lookup and scraping (Chhattisgarh web UI only).
     
@@ -706,11 +717,22 @@ def scrape_vehicle_weights_chhattisgarh(df_input, skip_db_phases=False):
     Web scraping uses the Chhattisgarh browser flow (process_single_vehicle / navigate_to_tax_page).
     
     skip_db_phases: if True, skip DB steps (caller already ran parallel_prefetch_vehicle_db_weights).
+    remote_url: if set, web scraping uses Selenium Grid (e.g. http://localhost:4444/wd/hub).
     """
     print("=" * 80)
     print("STARTING VEHICLE WEIGHT LOOKUP AND SCRAPING (CHHATTISGARH)")
     print("=" * 80)
+    if remote_url:
+        print(f"Selenium Grid remote URL: {remote_url}")
 
+    _thread_remote_url.value = remote_url
+    try:
+        return _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases)
+    finally:
+        _thread_remote_url.value = None
+
+
+def _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases=False):
     # Make a copy to avoid modifying the original
     df = df_input.copy()
 
@@ -911,13 +933,13 @@ def scrape_vehicle_weights_chhattisgarh(df_input, skip_db_phases=False):
             # Process single vehicle (use remaining_df index)
             driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, remaining_idx, remaining_df)
 
+            weight = remaining_df.at[remaining_idx, "Weight"]
+            # Always copy into main df (weights, N/A, errors) for result file / S3 output
+            df.at[remaining_idx, "Weight"] = weight
+
             if success:
                 scraped_count += 1
-                weight = remaining_df.at[remaining_idx, "Weight"]
-                
-                # Update main dataframe using original index
-                df.at[remaining_idx, "Weight"] = weight
-                
+
                 # Store in database if weight is valid
                 if weight and weight not in ["N/A", "Error", "Error - Input Not Found",
                                              "Error - Browser Restart Failed", "Error - Max Retries", "-"]:

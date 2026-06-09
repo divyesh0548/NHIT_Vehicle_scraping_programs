@@ -23,6 +23,17 @@ from config import (
     DB_PASSWORD,
     DB_PORT,
     DB_USER,
+    MAX_SELENIUM_GRID_NODES,
+    SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_PROCESSING,
+    SELENIUM_REMOTE_URL,
+)
+from selenium_grid_manager import (
+    assert_grid_ready,
+    split_dataframe as split_df_for_grid,
+    start_managed_nodes,
+    stop_managed_nodes,
+    wait_for_grid_ready,
 )
 
 # Initialize S3 client
@@ -63,6 +74,10 @@ VEHICLE_COLUMN_NAMES = [
 # Parallel DB prefetch (checkpostmaster; default flow also uses capacity_vehicle_numbers).
 # Each worker uses its own DB connection; web scraping stays single-threaded in scrape modules.
 DB_PREFETCH_WORKERS = 8
+
+# Web scraping: True = parallel sessions on Docker Selenium Grid; False = one local Chrome.
+# Default comes from .env (SELENIUM_PROCESSING); set True here to override without editing .env.
+selenium_processing = SELENIUM_PROCESSING
 
 
 def _find_veh_reg_column(df):
@@ -237,6 +252,72 @@ def parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=None):
     )
 
     return df
+
+
+def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
+    """
+    Chhattisgarh web scrape after DB prefetch. Uses Selenium Grid when selenium_processing is True.
+    """
+    if not selenium_processing:
+        return scrape_vehicle_weights_chhattisgarh(vehicle_df, skip_db_phases=skip_db_phases)
+
+    chunks = split_df_for_grid(vehicle_df, MAX_SELENIUM_GRID_NODES)
+    if not chunks:
+        return vehicle_df
+
+    print(
+        f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {SELENIUM_REMOTE_URL} "
+        f"(auto_nodes={SELENIUM_AUTO_MANAGE_NODES})",
+        flush=True,
+    )
+    managed_nodes = []
+    try:
+        if SELENIUM_AUTO_MANAGE_NODES:
+            managed_nodes = start_managed_nodes(len(chunks))
+            wait_for_grid_ready(SELENIUM_REMOTE_URL)
+        else:
+            assert_grid_ready(SELENIUM_REMOTE_URL)
+
+        result_frames = []
+        failures = []
+        with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+            future_to_chunk = {
+                executor.submit(
+                    scrape_vehicle_weights_chhattisgarh,
+                    chunk,
+                    skip_db_phases,
+                    SELENIUM_REMOTE_URL,
+                ): chunk_id
+                for chunk_id, chunk in enumerate(chunks, start=1)
+            }
+            for future in as_completed(future_to_chunk):
+                chunk_id = future_to_chunk[future]
+                try:
+                    result_frames.append(future.result())
+                    print(f"  [SELENIUM GRID] Chunk {chunk_id}/{len(chunks)} completed", flush=True)
+                except Exception as exc:
+                    failures.append((chunk_id, exc))
+                    print(f"  [SELENIUM GRID] Chunk {chunk_id} failed: {exc}", flush=True)
+
+        if not result_frames:
+            raise RuntimeError(f"All Selenium Grid chunks failed: {failures}")
+
+        # Overlay successful chunk results onto prefetched vehicle_df so failed chunks
+        # still keep DB-prefetch weights and S3 output row count stays complete.
+        merged = vehicle_df.copy()
+        for frame in result_frames:
+            for col in frame.columns:
+                merged.loc[frame.index, col] = frame[col]
+        if failures:
+            print(
+                f"  [WARNING] {len(failures)} Selenium Grid chunk(s) failed; "
+                f"those rows keep DB-prefetch values only",
+                flush=True,
+            )
+        return merged
+    finally:
+        if managed_nodes:
+            stop_managed_nodes(managed_nodes)
 
 
 def get_db_connection():
@@ -448,7 +529,7 @@ def process_excel_file(input_url, record_id):
         else:
             # Default vehicle weight scraping: parallel DB phases, then same web scrape as before
             vehicle_df = parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=DB_PREFETCH_WORKERS)
-            result_df = scrape_vehicle_weights_chhattisgarh(vehicle_df, skip_db_phases=True)
+            result_df = run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True)
         
         if result_df is None or len(result_df) == 0:
             print("  [ERROR] Web scraping returned empty result")
@@ -616,6 +697,9 @@ def main():
     print("="*80)
     print("Program will continuously check for pending files.")
     print("Rows with 'ihmcl' in input_file_s3_url are skipped (use main_IHMC_only.py).")
+    print(
+        f"Web scrape mode: {'Selenium Grid (' + SELENIUM_REMOTE_URL + ')' if selenium_processing else 'local Chrome'}"
+    )
     print("Press Ctrl+C to stop.")
     print("="*80)
     
