@@ -8,8 +8,8 @@ import time
 
 import pandas as pd
 
-from IHMCL_bot import scrape_ihmcl_for_dataframe
-from IHMCL_bot import build_grid_status_url
+from IHMCL_bot_selenium import scrape_ihmcl_for_dataframe
+from IHMCL_bot_selenium import build_grid_status_url
 
 
 INPUT_EXCEL = "test_input.xlsx"

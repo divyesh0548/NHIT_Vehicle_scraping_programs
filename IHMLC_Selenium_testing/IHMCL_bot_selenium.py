@@ -817,7 +817,7 @@ def scrape_ihmcl_for_dataframe(
     plaza_name: str = "Phulwaria Toll Plaza",
     remote_url: str = None,
     headless: bool = False,
-):
+   ):
     """
     Wrapper to run the IHMCL scraping flow using an in-memory DataFrame.
 
@@ -895,7 +895,7 @@ if __name__ == "__main__":
     import sys
     
     # Default values
-    input_file = "test.xlsx"
+    input_file = "test_input.xlsx"
     output_file = "ihmcl_vehicle_data.xlsx"
     mobile = "9999999999"
     plaza = "Phulwaria Toll Plaza"
