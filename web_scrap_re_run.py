@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from web_scrap_for_lookup_chhattisgarh import (
     WAIT_TIME,
+    _thread_remote_url,
     check_and_restore_db_connection,
     get_db_connection,
     navigate_to_tax_page,
@@ -47,18 +48,30 @@ def upsert_weight_to_checkpostmaster(cursor, veh_reg_no, weight):
         return False, f"Error: {e}"
 
 
-def scrape_vehicle_weights_rerun(df_input):
+def scrape_vehicle_weights_rerun(df_input, remote_url=None):
     """
     Web-only vehicle weight scraping for rerun files.
 
     - Skips DB lookup phases entirely
     - Scrapes weight from website for each vehicle
     - Updates/inserts scraped weight into checkpostmaster only
+
+    remote_url: if set, uses Selenium Grid (e.g. http://localhost:4444/wd/hub).
     """
     print("=" * 80)
     print("STARTING WEB-ONLY VEHICLE WEIGHT RERUN")
     print("=" * 80)
+    if remote_url:
+        print(f"Selenium Grid remote URL: {remote_url}")
 
+    _thread_remote_url.value = remote_url
+    try:
+        return _scrape_vehicle_weights_rerun_impl(df_input)
+    finally:
+        _thread_remote_url.value = None
+
+
+def _scrape_vehicle_weights_rerun_impl(df_input):
     df = df_input.copy()
 
     veh_col = None
@@ -157,9 +170,10 @@ def scrape_vehicle_weights_rerun(df_input):
 
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)
 
+        weight = str(df.at[idx, "Weight"]).strip()
+
         if success:
             scraped_count += 1
-            weight = str(df.at[idx, "Weight"]).strip()
 
             if weight not in invalid_weight_values:
                 try:

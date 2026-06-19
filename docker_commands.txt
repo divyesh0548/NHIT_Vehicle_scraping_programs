@@ -1,0 +1,5 @@
+docker network create selenium-grid
+
+docker run -d --name selenium-hub --network selenium-grid -p 4444:4444 -p 4442:4442 -p 4443:4443 selenium/hub:latest
+
+docker network connect selenium-grid selenium-hub

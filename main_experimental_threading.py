@@ -254,27 +254,22 @@ def parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=None):
     return df
 
 
-def _run_local_vehicle_web_scrape(vehicle_df, skip_db_phases=True):
-    """Single local Chrome session (default scraper path)."""
-    print("  [WEB SCRAPE] Running local Chrome (single browser)...", flush=True)
-    return scrape_vehicle_weights_chhattisgarh(vehicle_df, skip_db_phases=skip_db_phases)
-
-
-def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
+def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE"):
     """
-    Chhattisgarh web scrape after DB prefetch.
-    When selenium_processing is True, tries Selenium Grid first; on any grid error,
-    falls back to local Chrome on the prefetched dataframe (or partial grid results).
+    Try parallel Selenium Grid scrape via scrape_fn(chunk_df, remote_url).
+    remote_url=None means local Chrome inside the scraper.
+    On grid failure, falls back to local Chrome on full/partial results.
     """
     if not selenium_processing:
-        return _run_local_vehicle_web_scrape(vehicle_df, skip_db_phases=skip_db_phases)
+        print(f"  [{scrape_label}] Running local Chrome (single browser)...", flush=True)
+        return scrape_fn(vehicle_df, None)
 
     chunks = split_df_for_grid(vehicle_df, MAX_SELENIUM_GRID_NODES)
     if not chunks:
         return vehicle_df
 
     print(
-        f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {SELENIUM_REMOTE_URL} "
+        f"  [SELENIUM GRID] {scrape_label}: {len(chunks)} chunk(s) -> {SELENIUM_REMOTE_URL} "
         f"(auto_nodes={SELENIUM_AUTO_MANAGE_NODES})",
         flush=True,
     )
@@ -294,12 +289,7 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
         failures = []
         with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
             future_to_chunk = {
-                executor.submit(
-                    scrape_vehicle_weights_chhattisgarh,
-                    chunk,
-                    skip_db_phases,
-                    SELENIUM_REMOTE_URL,
-                ): chunk_id
+                executor.submit(scrape_fn, chunk, SELENIUM_REMOTE_URL): chunk_id
                 for chunk_id, chunk in enumerate(chunks, start=1)
             }
             for future in as_completed(future_to_chunk):
@@ -307,12 +297,15 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
                 try:
                     result_frames.append(future.result())
                     print(
-                        f"  [SELENIUM GRID] Chunk {chunk_id}/{len(chunks)} completed",
+                        f"  [SELENIUM GRID] {scrape_label} chunk {chunk_id}/{len(chunks)} completed",
                         flush=True,
                     )
                 except Exception as exc:
                     failures.append((chunk_id, exc))
-                    print(f"  [SELENIUM GRID] Chunk {chunk_id} failed: {exc}", flush=True)
+                    print(
+                        f"  [SELENIUM GRID] {scrape_label} chunk {chunk_id} failed: {exc}",
+                        flush=True,
+                    )
 
         if result_frames:
             merged = vehicle_df.copy()
@@ -327,20 +320,40 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
 
     except Exception as exc:
         grid_error = str(exc)
-        print(f"  [SELENIUM GRID] Error: {exc}", flush=True)
+        print(f"  [SELENIUM GRID] {scrape_label} error: {exc}", flush=True)
     finally:
         if managed_nodes:
             stop_managed_nodes(managed_nodes)
 
     if grid_error:
         print(
-            "  [SELENIUM GRID] Falling back to local Chrome web scraping...",
+            f"  [SELENIUM GRID] {scrape_label}: falling back to local Chrome...",
             flush=True,
         )
         df_for_local = merged if merged is not None else vehicle_df
-        return _run_local_vehicle_web_scrape(df_for_local, skip_db_phases=skip_db_phases)
+        return scrape_fn(df_for_local, None)
 
     return merged
+
+
+def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
+    """Chhattisgarh web scrape after DB prefetch (grid with local fallback)."""
+
+    def scrape_chunk(chunk, remote_url):
+        return scrape_vehicle_weights_chhattisgarh(
+            chunk, skip_db_phases=skip_db_phases, remote_url=remote_url
+        )
+
+    return _run_selenium_grid_scrape(vehicle_df, scrape_chunk, scrape_label="WEIGHT")
+
+
+def run_rerun_web_scrape(vehicle_df):
+    """Rerun web-only scrape (grid with local fallback)."""
+
+    def scrape_chunk(chunk, remote_url):
+        return scrape_vehicle_weights_rerun(chunk, remote_url=remote_url)
+
+    return _run_selenium_grid_scrape(vehicle_df, scrape_chunk, scrape_label="RERUN")
 
 
 def get_db_connection():
@@ -548,7 +561,7 @@ def process_excel_file(input_url, record_id):
             result_df = scrape_ihmcl_for_dataframe(vehicle_df)
         elif "rerun" in filename_lc:
             # Web-only weight scraping for rerun files; updates checkpostmaster after scrape
-            result_df = scrape_vehicle_weights_rerun(vehicle_df)
+            result_df = run_rerun_web_scrape(vehicle_df)
         else:
             # Default vehicle weight scraping: parallel DB phases, then same web scrape as before
             vehicle_df = parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=DB_PREFETCH_WORKERS)

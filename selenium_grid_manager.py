@@ -52,16 +52,48 @@ def ensure_hub_container_running(hub_name=SELENIUM_HUB_CONTAINER):
     running = run_docker_command(["docker", "ps", "--format", "{{.Names}}"], check=True)
     running_names = {line.strip() for line in running.splitlines() if line.strip()}
     if hub_name not in running_names:
+        hint = ""
+        if running_names:
+            hint = f" Running containers: {', '.join(sorted(running_names))}."
         raise RuntimeError(
-            f"Selenium hub container '{hub_name}' is not running. "
-            "Start the hub first (e.g. docker compose up -d), then rerun."
+            f"Selenium hub container '{hub_name}' is not running.{hint} "
+            "Set SELENIUM_HUB_CONTAINER in .env to match `docker ps` name, "
+            "then start the hub (e.g. docker compose up -d)."
         )
+
+
+def ensure_hub_on_network(hub_name=SELENIUM_HUB_CONTAINER, network=SELENIUM_NETWORK):
+    """
+    Auto-started nodes join SELENIUM_NETWORK and reach the hub by container name.
+    If the hub was started outside that network, nodes never register (registered_nodes=0).
+    """
+    try:
+        raw = run_docker_command(
+            ["docker", "inspect", hub_name, "--format", "{{json .NetworkSettings.Networks}}"],
+            check=True,
+        )
+        networks = json.loads(raw) if raw else {}
+        if network in networks:
+            return
+        print(
+            f"Connecting hub '{hub_name}' to Docker network '{network}' "
+            f"(required for auto-started Chrome nodes)",
+            flush=True,
+        )
+        run_docker_command(["docker", "network", "connect", network, hub_name], check=True)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Could not attach hub '{hub_name}' to network '{network}': {exc}. "
+            "Start hub and nodes on the same Docker network, or set SELENIUM_AUTO_MANAGE_NODES=false "
+            "and register nodes yourself."
+        ) from exc
 
 
 def start_managed_nodes(node_count, hub_name=SELENIUM_HUB_CONTAINER, network=SELENIUM_NETWORK):
     """Create Chrome node containers; returns names started by this run."""
     ensure_network_exists(network)
     ensure_hub_container_running(hub_name)
+    ensure_hub_on_network(hub_name, network)
 
     started_nodes = []
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -125,5 +157,9 @@ def wait_for_grid_ready(remote_url=SELENIUM_REMOTE_URL, timeout_seconds=SELENIUM
             last_error = exc
             time.sleep(3)
     raise RuntimeError(
-        f"Selenium Grid did not become ready within {timeout_seconds}s. {last_error}"
+        f"Selenium Grid did not become ready within {timeout_seconds}s. {last_error}. "
+        f"Check: (1) SELENIUM_HUB_CONTAINER={SELENIUM_HUB_CONTAINER} matches `docker ps`, "
+        f"(2) hub is on network {SELENIUM_NETWORK}, "
+        f"(3) http://localhost:4444/status shows ready=true, "
+        f"(4) `docker logs <node-name>` if nodes exit immediately."
     )
