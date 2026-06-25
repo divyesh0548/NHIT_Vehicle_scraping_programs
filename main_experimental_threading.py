@@ -587,13 +587,15 @@ def process_excel_file(input_url, record_id):
         # Extract filename from input URL and use same name for output
         input_filename = extract_filename_from_url(input_url)
         
-        # Step 3: Pass to appropriate web scraping function based on filename
+        # Step 3: Pass to appropriate web scraping function based on file type
         print("\n[STEP 3] Starting web scraping / automation based on file type...")
         filename_lc = (input_filename or "").lower()
+        input_url_lc = (input_url or "").lower()
+        is_ihmcl = "ihmcl" in filename_lc or "ihmcl" in input_url_lc
         if "permit" in filename_lc:
             # Permit-specific scraping
             result_df = scrape_vehicle_details_for_permit(vehicle_df)
-        elif "ihmcl" in filename_lc:
+        elif is_ihmcl:
             # IHMCL FASTag portal automation (grid with local fallback)
             result_df = run_ihmcl_web_scrape(vehicle_df)
         elif "rerun" in filename_lc:
@@ -626,11 +628,12 @@ def process_excel_file(input_url, record_id):
         else:
             output_filename = input_filename  # Keep same filename as input
         
-        # Check if filename contains specific keywords (case-insensitive) to decide S3 target folder
+        # Check if filename or input URL contains specific keywords (case-insensitive) to decide S3 target folder
         filename_lc = (input_filename or "").lower()
+        input_url_lc = (input_url or "").lower()
         if "permit" in filename_lc:
             s3_key = f"NHIT_Permit_Data/output/{output_filename}"
-        elif "ihmcl" in filename_lc:
+        elif "ihmcl" in filename_lc or "ihmcl" in input_url_lc:
             s3_key = f"NHIT_IHMCL/output/{output_filename}"
         elif "rerun" in filename_lc:
             s3_key = f"NHIT_RE_RUN/output/{output_filename}"
@@ -716,7 +719,6 @@ def check_and_process_pending_files():
                     WHERE (output_file_s3_url IS NULL OR output_file_s3_url = '' OR output_file_s3_url::text = '')
                     AND input_file_s3_url IS NOT NULL
                     AND input_file_s3_url != ''
-                    AND LOWER(input_file_s3_url) NOT LIKE '%ihmcl%'
                     AND (in_process IS NULL OR in_process = 0)
                     ORDER BY id ASC
                     LIMIT 1
@@ -768,8 +770,7 @@ def main():
     print("="*80)
     print("NHIT VEHICLES PROCESSING AUTOMATION")
     print("="*80)
-    print("Program will continuously check for pending files.")
-    print("Rows with 'ihmcl' in input_file_s3_url are skipped (use main_IHMC_only.py).")
+    print("Program will continuously check for pending files (including IHMCL).")
     print(
         f"Web scrape mode: {'Selenium Grid (' + SELENIUM_REMOTE_URL + ')' if selenium_processing else 'local Chrome'}"
     )
