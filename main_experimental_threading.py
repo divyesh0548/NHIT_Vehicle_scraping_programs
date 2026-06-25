@@ -11,7 +11,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 from web_scrap_for_lookup_chhattisgarh import scrape_vehicle_weights_chhattisgarh, check_vehicle_in_database
 from web_scrap_for_permit import scrape_vehicle_details_for_permit
 from web_scrap_re_run import scrape_vehicle_weights_rerun
-from IHMCL_bot import scrape_ihmcl_for_dataframe
+from IHMCL_bot_selenium import scrape_ihmcl_for_dataframe
 from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_number
 from config import (
     AWS_ACCESS_KEY_ID,
@@ -254,11 +254,15 @@ def parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=None):
     return df
 
 
-def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE"):
+def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", merge_mode="index"):
     """
     Try parallel Selenium Grid scrape via scrape_fn(chunk_df, remote_url).
     remote_url=None means local Chrome inside the scraper.
     On grid failure, falls back to local Chrome on full/partial results.
+
+    merge_mode:
+      - "index": merge chunk columns back onto vehicle_df by row index (weight/rerun flows)
+      - "concat": concatenate chunk result frames (IHMCL scraped output rows)
     """
     if not selenium_processing:
         print(f"  [{scrape_label}] Running local Chrome (single browser)...", flush=True)
@@ -308,10 +312,20 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE"):
                     )
 
         if result_frames:
-            merged = vehicle_df.copy()
-            for frame in result_frames:
-                for col in frame.columns:
-                    merged.loc[frame.index, col] = frame[col]
+            if merge_mode == "concat":
+                non_empty = [
+                    frame for frame in result_frames if frame is not None and not frame.empty
+                ]
+                if non_empty:
+                    merged = pd.concat(non_empty, ignore_index=True)
+                    merged = merged.drop_duplicates().reset_index(drop=True)
+                else:
+                    merged = pd.DataFrame()
+            else:
+                merged = vehicle_df.copy()
+                for frame in result_frames:
+                    for col in frame.columns:
+                        merged.loc[frame.index, col] = frame[col]
 
         if not result_frames:
             grid_error = f"All Selenium Grid chunks failed: {failures}"
@@ -330,10 +344,33 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE"):
             f"  [SELENIUM GRID] {scrape_label}: falling back to local Chrome...",
             flush=True,
         )
-        df_for_local = merged if merged is not None else vehicle_df
+        if merge_mode == "concat":
+            df_for_local = vehicle_df
+        else:
+            df_for_local = merged if merged is not None else vehicle_df
         return scrape_fn(df_for_local, None)
 
     return merged
+
+
+def run_ihmcl_web_scrape(vehicle_df):
+    """IHMCL FASTag portal scrape (grid with local fallback)."""
+    mobile_number = os.getenv("IHMCL_MOBILE_NUMBER", "9999999999")
+    plaza_name = os.getenv("IHMCL_PLAZA_NAME", "Phulwaria Toll Plaza")
+    headless = os.getenv("IHMCL_HEADLESS", "false").strip().lower() in {"1", "true", "yes"}
+
+    def scrape_chunk(chunk, remote_url):
+        return scrape_ihmcl_for_dataframe(
+            chunk,
+            mobile_number=mobile_number,
+            plaza_name=plaza_name,
+            remote_url=remote_url,
+            headless=headless,
+        )
+
+    return _run_selenium_grid_scrape(
+        vehicle_df, scrape_chunk, scrape_label="IHMCL", merge_mode="concat"
+    )
 
 
 def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
@@ -557,8 +594,8 @@ def process_excel_file(input_url, record_id):
             # Permit-specific scraping
             result_df = scrape_vehicle_details_for_permit(vehicle_df)
         elif "ihmcl" in filename_lc:
-            # IHMCL FASTag portal automation (uses vehicle_df as input and returns a DataFrame)
-            result_df = scrape_ihmcl_for_dataframe(vehicle_df)
+            # IHMCL FASTag portal automation (grid with local fallback)
+            result_df = run_ihmcl_web_scrape(vehicle_df)
         elif "rerun" in filename_lc:
             # Web-only weight scraping for rerun files; updates checkpostmaster after scrape
             result_df = run_rerun_web_scrape(vehicle_df)
