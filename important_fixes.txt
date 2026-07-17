@@ -1,5 +1,0 @@
-Filter the vehicle numbers based on length. Currently some unwanted errorneous numbers are queued in web-scraping which is waste of time.
-
-
-Change the web-scraping of permit data. Chnage the state to "CHHATTISGARH".
-Required fields : Permit Type, Permit Validity, Permit No.

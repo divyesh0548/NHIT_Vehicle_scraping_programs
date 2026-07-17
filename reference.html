@@ -1,159 +1,49 @@
-<div id="taxcollodc" class="ui-panel ui-widget ui-widget-content ui-corner-all bottom-space" data-widget="widget_taxcollodc" role="region" aria-labelledby="taxcollodc_header"><div id="taxcollodc_header" class="ui-panel-titlebar ui-widget-header ui-helper-clearfix ui-corner-all"><span class="ui-panel-title">Tax Payment Details</span></div><div id="taxcollodc_content" class="ui-panel-content ui-widget-content">
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-6">
-            <label class="field-label resp-label-section"><label id="j_idt434" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Vehicle No.</span></label>
-            </label><input id="j_idt436" name="j_idt436" type="text" value="RJ09GC2453" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="10" onkeypress="return AlphaOnly(event, 'abcdefghijklmnopqrstuvwxyz0123456789');" onkeyup="makeCaps(this);">
-        </div>
-        <div class="ui-grid-col-2">
-            <div class="ui-grid-row">
-                <div class="ui-grid-col-12 top_mar1 mar-left5"><button id="getdetails" name="getdetails" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.ab({s:&quot;getdetails&quot;,f:&quot;master_Layout_form&quot;,u:&quot;taxcollodc popup PendingDialog&quot;,onst:function(cfg){PF('masterLayoutVar').show();;},onsu:function(data,status,xhr){PF('masterLayoutVar').hide();;}});return false;" title="Click to get owner and vehicle details from vahan 4." type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-arrowthick-1-s"></span><span class="ui-button-text ui-c">Get Details</span></button>
-                </div>
-            </div>
-        </div>
-        <div class="ui-grid-col-4">
-            <div class="ui-grid-row">
-                <div class="ui-grid-col-12 top_mar1 mar-left5"><button id="getdetails1" name="getdetails1" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.ab({s:&quot;getdetails1&quot;,f:&quot;master_Layout_form&quot;,u:&quot;taxcollodc DimensionDialog&quot;,onst:function(cfg){PF('masterLayoutVar').show();;},onsu:function(data,status,xhr){PF('masterLayoutVar').hide();;}});return false;" title="Click to get owner and vehicle details from vahan 4." type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-refresh"></span><span class="ui-button-text ui-c">Reset All</span></button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt440" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Chassis No.</span></label>
-            </label><input id="j_idt442" name="j_idt442" type="text" value="MA1VDAPGDJ6D*****" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="30" onkeypress="return AlphaOnly(event, '*#.0123456789');" onkeyup="makeCaps(this);">
-        </div>   
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt444" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Owner Type</span></label>
-            </label><div id="j_idt446" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled " style="min-width: 167px;"><div class="ui-helper-hidden-accessible"><select id="j_idt446_input" name="j_idt446_input" tabindex="-1" autocomplete="off" aria-hidden="true" disabled="disabled"><option value="-1" data-escape="true">---Select Owner Type---</option><option value="2" selected="selected" data-escape="true">FIRM</option><option value="1" data-escape="true">INDIVIDUAL</option></select></div><span id="j_idt446_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="j_idt446_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false" disabled="disabled">FIRM</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div><div id="j_idt446_panel" class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay" tabindex="-1"><div class="ui-selectonemenu-items-wrapper" style="max-height:200px"></div></div></div>     
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt450" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Owner/Firm Name</span></label>
-            </label><input id="j_idt452" name="j_idt452" type="text" value="F*****S R*******S P*****E L*****D" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="50" onkeypress="return AlphaWithSpaceOnly(event, '. ');" onkeyup="makeCaps(this);">
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt454" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Mobile No.</span></label>
-            </label><input id="mobileno" name="mobileno" type="text" value="90797****2" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-filled" autocomplete="off" maxlength="10" placeholder="SMS about payment will be sent to this number." title="SMS about payment will be sent to this number." onkeypress="return NumericOnly(event, '');">
-        </div> 
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt457" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Vehicle Type</span></label>
-            </label><div id="j_idt459" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled " style="min-width: 136px;"><div class="ui-helper-hidden-accessible"><select id="j_idt459_input" name="j_idt459_input" tabindex="-1" autocomplete="off" aria-hidden="true" disabled="disabled"><option value="3" selected="selected" data-escape="true">GOODS VEHICLE</option></select></div><span id="j_idt459_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="j_idt459_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false" disabled="disabled">GOODS VEHICLE</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div><div id="j_idt459_panel" class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay" tabindex="-1"><div class="ui-selectonemenu-items-wrapper" style="max-height:200px"></div></div></div>     
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt462" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Vehicle Class</span></label>
-            </label><div id="j_idt464" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled " style="min-width: 197px;"><div class="ui-helper-hidden-accessible"><select id="j_idt464_input" name="j_idt464_input" tabindex="-1" autocomplete="off" aria-hidden="true" disabled="disabled"><option value="-1" data-escape="true">---Select Vehicle Class---</option><option value="591" data-escape="true">LIGHT GOODS VEHICLE</option><option value="592" data-escape="true">MEDIUM GOODS VEHICLE</option><option value="593" data-escape="true">HEAVY GOODS VEHICLE</option><option value="84" selected="selected" data-escape="true">ARTICULATED VEHICLE</option></select></div><span id="j_idt464_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="j_idt464_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false" disabled="disabled">ARTICULATED VEHICLE</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div><div id="j_idt464_panel" class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay" tabindex="-1"><div class="ui-selectonemenu-items-wrapper" style="max-height:200px"></div></div></div> 
-        </div>
+Services :
 
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="lbl_gvw" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">GVW (In Kg.)</span></label>
-            </label><input id="txt_laden_wt" name="txt_laden_wt" type="text" value="55000" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="6" onkeypress="return NumericOnly(event, '');" onblur="PrimeFaces.ab({s:&quot;txt_laden_wt&quot;,e:&quot;blur&quot;,f:&quot;master_Layout_form&quot;,p:&quot;taxcollodc&quot;,u:&quot;taxcollodc&quot;});">
-        </div> 
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="lbl_ungvw" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Vehicle Total Weight with Consignment(In Kg.)</span></label>
-            </label><input id="txt_unladen_wt" name="txt_unladen_wt" type="text" value="" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all" autocomplete="off" maxlength="6" onkeypress="return NumericOnly(event, '');" aria-describedby="j_idt471">
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt473" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Body Type</span></label>
-            </label><span id="body_type" class="ui-menubutton ui-widget"><button id="body_type_button" name="body_type_button" type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c ui-icon-triangle-1-s"></span><span class="ui-button-text ui-c">-------Select Body Type-------</span></button></span> 
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt480" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Overdimension Type</span></label>
-            </label><span id="over_dim_type" class="ui-menubutton ui-widget"><button id="over_dim_type_button" name="over_dim_type_button" type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" role="button" aria-disabled="false"><span class="ui-button-icon-left ui-icon ui-c ui-icon-triangle-1-s"></span><span class="ui-button-text ui-c">Select Overdimension Type</span></button></span>
-        </div>
-        <div class="ui-grid-col-6">
-            <label class="field-label resp-label-section"><label id="j_idt486" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Nature of Goods</span></label>
-            </label><div id="goods_nature" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 194px;"><div class="ui-helper-hidden-accessible"><select id="goods_nature_input" name="goods_nature_input" tabindex="-1" autocomplete="off" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;goods_nature&quot;,e:&quot;change&quot;,f:&quot;master_Layout_form&quot;,p:&quot;taxcollodc&quot;,u:&quot;taxcollodc&quot;});"><option value="-1" selected="selected" data-escape="true">---Select Nature of Goods---</option></select></div><span id="goods_nature_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="goods_nature_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select Nature of Goods---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div> 
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt491" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Permit Type</span></label>
-            </label><div id="permit_type" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 231px;"><div class="ui-helper-hidden-accessible"><select id="permit_type_input" name="permit_type_input" tabindex="-1" autocomplete="off" aria-hidden="true"><option value="-1" data-escape="true">---Select Permit Type---</option><option value="1" data-escape="true">TEMPORARY PERMIT</option><option value="6" selected="selected" data-escape="true">NATIONAL PERMIT</option><option value="7" data-escape="true">GOODS PERMIT</option><option value="8" data-escape="true">COUNTER SIGNATURE PERMIT</option></select></div><span id="permit_type_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="permit_type_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">NATIONAL PERMIT</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="lbl_gcw" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Gross Combination Weight(In Kg.)</span></label>
-            </label><input id="txt_gcw" name="txt_gcw" type="text" value="49000" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="6" onkeypress="return NumericOnly(event, '');">
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="permit_no" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Permit/Authorization No.</span></label>
-            </label><input id="txt_permit_no" name="txt_permit_no" type="text" value="RJ2025-NP-8936C" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled" disabled="disabled" autocomplete="off" maxlength="50" onkeypress="return AlphaOnly(event, 'abcdefghijklmnopqrstuvwxyz0123456789/-() ');" onkeyup="makeCaps(this);">
-        </div> 
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt500" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Road Tax Validity</span></label>
-            </label><span id="j_idt502" class="ui-calendar ui-inputwrapper-filled"><input id="j_idt502_input" name="j_idt502_input" type="text" value="31-03-2027" class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY" disabled=""></span>
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt504" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">From State</span></label>
-            </label><div id="j_idt506" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 178px;"><div class="ui-helper-hidden-accessible"><select id="j_idt506_input" name="j_idt506_input" tabindex="-1" autocomplete="off" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;j_idt506&quot;,e:&quot;change&quot;,f:&quot;master_Layout_form&quot;,p:&quot;j_idt506&quot;,u:&quot;district&quot;});"><option value="-1" selected="selected" data-escape="true">---Select from State---</option><option value="AN" data-escape="true">ANDAMAN &amp; NICOBAR</option><option value="AP" data-escape="true">ANDHRA PRADESH</option><option value="AR" data-escape="true">ARUNACHAL PRADESH</option><option value="AS" data-escape="true">ASSAM</option><option value="BR" data-escape="true">BIHAR</option><option value="CH" data-escape="true">CHANDIGARH</option><option value="CG" data-escape="true">CHHATTISGARH</option><option value="DL" data-escape="true">DELHI</option><option value="GA" data-escape="true">GOA</option><option value="GJ" data-escape="true">GUJARAT</option><option value="HR" data-escape="true">HARYANA</option><option value="HP" data-escape="true">HIMACHAL PRADESH</option><option value="JK" data-escape="true">JAMMU &amp; KASHMIR</option><option value="JH" data-escape="true">JHARKHAND</option><option value="KA" data-escape="true">KARNATAKA</option><option value="KL" data-escape="true">KERALA</option><option value="LD" data-escape="true">LAKSHADWEEP</option><option value="MP" data-escape="true">MADHYA PRADESH</option><option value="MH" data-escape="true">MAHARASHTRA</option><option value="MN" data-escape="true">MANIPUR</option><option value="ML" data-escape="true">MEGHALAYA</option><option value="MZ" data-escape="true">MIZORAM</option><option value="NL" data-escape="true">NAGALAND</option><option value="OR" data-escape="true">ODISHA</option><option value="PY" data-escape="true">PONDICHERRY</option><option value="PB" data-escape="true">PUNJAB</option><option value="RJ" data-escape="true">RAJASTHAN</option><option value="SK" data-escape="true">SIKKIM</option><option value="TN" data-escape="true">TAMIL NADU</option><option value="TS" data-escape="true">TELANGANA</option><option value="TR" data-escape="true">TRIPURA</option><option value="DD" data-escape="true">UT of DNH and DD</option><option value="UP" data-escape="true">UTTAR PRADESH</option><option value="UK" data-escape="true">UTTRAKHAND</option><option value="WB" data-escape="true">WEST BENGAL</option></select></div><span id="j_idt506_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="j_idt506_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select from State---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div> 
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt510" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">From District</span></label>
-            </label><div id="district" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 171px;"><div class="ui-helper-hidden-accessible"><select id="district_input" name="district_input" tabindex="-1" autocomplete="off" aria-hidden="true"><option value="-1" selected="selected" data-escape="true">---Select From District---</option></select></div><span id="district_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="district_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select From District---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt515" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">To State</span></label>
-            </label><div id="j_idt517" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 178px;"><div class="ui-helper-hidden-accessible"><select id="j_idt517_input" name="j_idt517_input" tabindex="-1" autocomplete="off" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;j_idt517&quot;,e:&quot;change&quot;,f:&quot;master_Layout_form&quot;,p:&quot;j_idt517&quot;,u:&quot;to_district&quot;});"><option value="-1" selected="selected" data-escape="true">---Select To State---</option><option value="AN" data-escape="true">ANDAMAN &amp; NICOBAR</option><option value="AP" data-escape="true">ANDHRA PRADESH</option><option value="AR" data-escape="true">ARUNACHAL PRADESH</option><option value="AS" data-escape="true">ASSAM</option><option value="BR" data-escape="true">BIHAR</option><option value="CH" data-escape="true">CHANDIGARH</option><option value="CG" data-escape="true">CHHATTISGARH</option><option value="DL" data-escape="true">DELHI</option><option value="GA" data-escape="true">GOA</option><option value="GJ" data-escape="true">GUJARAT</option><option value="HR" data-escape="true">HARYANA</option><option value="HP" data-escape="true">HIMACHAL PRADESH</option><option value="JK" data-escape="true">JAMMU &amp; KASHMIR</option><option value="JH" data-escape="true">JHARKHAND</option><option value="KA" data-escape="true">KARNATAKA</option><option value="KL" data-escape="true">KERALA</option><option value="LD" data-escape="true">LAKSHADWEEP</option><option value="MP" data-escape="true">MADHYA PRADESH</option><option value="MH" data-escape="true">MAHARASHTRA</option><option value="MN" data-escape="true">MANIPUR</option><option value="ML" data-escape="true">MEGHALAYA</option><option value="MZ" data-escape="true">MIZORAM</option><option value="NL" data-escape="true">NAGALAND</option><option value="OR" data-escape="true">ODISHA</option><option value="PY" data-escape="true">PONDICHERRY</option><option value="PB" data-escape="true">PUNJAB</option><option value="RJ" data-escape="true">RAJASTHAN</option><option value="SK" data-escape="true">SIKKIM</option><option value="TN" data-escape="true">TAMIL NADU</option><option value="TS" data-escape="true">TELANGANA</option><option value="TR" data-escape="true">TRIPURA</option><option value="DD" data-escape="true">UT of DNH and DD</option><option value="UP" data-escape="true">UTTAR PRADESH</option><option value="UK" data-escape="true">UTTRAKHAND</option><option value="WB" data-escape="true">WEST BENGAL</option></select></div><span id="j_idt517_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="j_idt517_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select To State---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt521" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">To District</span></label>
-            </label><div id="to_district" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 153px;"><div class="ui-helper-hidden-accessible"><select id="to_district_input" name="to_district_input" tabindex="-1" autocomplete="off" aria-hidden="true"><option value="-1" selected="selected" data-escape="true">---Select To District---</option></select></div><span id="to_district_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="to_district_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select To District---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt526" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Insurance Validity</span></label>
-            </label><span id="j_idt528" class="ui-calendar ui-inputwrapper-filled"><input id="j_idt528_input" name="j_idt528_input" type="text" value="19-06-2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY" disabled=""></span>
-        </div>   
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt530" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Fitness Validity</span></label>
-            </label><span id="j_idt532" class="ui-calendar ui-inputwrapper-filled"><input id="j_idt532_input" name="j_idt532_input" type="text" value="06-08-2026" class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY" disabled=""></span>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt534" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">PUCC Validity</span></label>
-            </label><span id="j_idt536" class="ui-calendar"><input id="j_idt536_input" name="j_idt536_input" type="text" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY"></span>
-        </div>   
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt538" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Permit Validity</span></label>
-            </label><span id="j_idt540" class="ui-calendar ui-inputwrapper-filled"><input id="j_idt540_input" name="j_idt540_input" type="text" value="13-10-2030" class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY" disabled=""></span>
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt542" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">LR No.</span></label>
-            </label><input id="j_idt544" name="j_idt544" type="text" value="" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all" autocomplete="off" maxlength="100" placeholder="ENTER LR NUMBER" onkeypress="return AlphaOnly(event, 'abcdefghijklmnopqrstuvwxyz0123456789/');" onkeyup="makeCaps(this);">
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt546" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">LR Date</span></label>
-            </label><span id="j_idt548" class="ui-calendar"><input id="j_idt548_input" name="j_idt548_input" type="text" class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker" autocomplete="off" placeholder="DD-MM-YYYY"></span>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt550" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Goods Description</span></label>
-            </label><div id="goodd_description" class="ui-selectonemenu ui-widget ui-state-default ui-corner-all" style="min-width: 235px;"><div class="ui-helper-hidden-accessible"><select id="goodd_description_input" name="goodd_description_input" tabindex="-1" autocomplete="off" aria-hidden="true" onchange="PrimeFaces.ab({s:&quot;goodd_description&quot;,e:&quot;change&quot;,f:&quot;master_Layout_form&quot;,p:&quot;goodd_description&quot;,u:&quot;remarks&quot;});"><option value="-1" selected="selected" data-escape="true">---Select Goods Description---</option><option value="1" data-escape="true">AUTOMOBILE PRODUCT</option><option value="2" data-escape="true">BITCHING PLANT</option><option value="3" data-escape="true">CLOTHES</option><option value="4" data-escape="true">CONSTRUCTION EQUIPMENT</option><option value="5" data-escape="true">COTTON</option><option value="6" data-escape="true">FABRICATED PART/MACHINERY</option><option value="7" data-escape="true">PIPE</option><option value="8" data-escape="true">PLATE/ROD</option><option value="9" data-escape="true">TRANSFORMER</option><option value="10" data-escape="true">VESSLE/TANK</option><option value="11" data-escape="true">WAGON</option><option value="12" data-escape="true">WIND MILL BLADE</option><option value="13" data-escape="true">WIND MILL HUB</option><option value="14" data-escape="true">WIND MILL TOWER</option><option value="99" data-escape="true">OTHER</option></select></div><span id="goodd_description_label" class="ui-selectonemenu-label ui-inputfield ui-corner-all" tabindex="0" aria-controls="goodd_description_panel" role="combobox" aria-haspopup="listbox" aria-expanded="false">---Select Goods Description---</span><div class="ui-selectonemenu-trigger ui-state-default ui-corner-right"><span class="ui-icon ui-icon-triangle-1-s ui-c"></span></div></div>
-        </div>
-        <div class="ui-grid-col-3">
-            <label class="field-label resp-label-section"><label id="j_idt555" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Fill in case of Other</span></label>
-            </label><input id="remarks" name="remarks" type="text" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled" disabled="disabled" autocomplete="off" maxlength="100" placeholder="DESCRIPTION OF GOODS" onkeypress="return AlphaWithSpaceOnly(event, '. ');" onkeyup="makeCaps(this);">
-        </div>
-    </div>
-    <br>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-12"><div id="qqq" class="ui-datatable ui-widget"><div class="ui-datatable-tablewrapper"><table role="grid"><thead id="qqq_head"><tr><th id="qqq:j_idt558" class="ui-state-default center-position collumn-width" aria-label="Sl. No." scope="col"><span class="ui-column-title">Sl. No.</span></th><th id="qqq:j_idt560" class="ui-state-default" aria-label="Particulars" scope="col"><span class="ui-column-title">Particulars</span></th><th id="qqq:j_idt562" class="ui-state-default" aria-label="Height" scope="col" style="width: 140px;"><span class="ui-column-title">Height</span></th><th id="qqq:j_idt564" class="ui-state-default" aria-label="Width" scope="col" style="width: 140px;"><span class="ui-column-title">Width</span></th><th id="qqq:j_idt566" class="ui-state-default" aria-label="Length" scope="col" style="width: 140px;"><span class="ui-column-title">Length</span></th><th id="qqq:j_idt568" class="ui-state-default" aria-label="Fee" scope="col" style="width: 140px;"><span class="ui-column-title">Fee</span></th></tr></thead><tbody id="qqq_data" class="ui-datatable-data ui-widget-content"><tr class="ui-widget-content ui-datatable-empty-message"><td colspan="6">No records found.</td></tr></tbody></table></div></div>
-        </div>
-    </div>
-    <div class="ui-grid-row">
-        <div class="ui-grid-col-4">
-            <label class="field-label resp-label-section"><label id="j_idt571" class="ui-outputlabel ui-widget field-label-mandate"><span class="ui-outputlabel-label">Fee Amount</span></label>
-            </label><input id="total_tax_amount" name="total_tax_amount" type="text" class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled" disabled="disabled" autocomplete="off" maxlength="8">
-        </div>  
-        <div class="ui-grid-col-8">
-            <div class="ui-grid-row">
-                <div class="ui-grid-col-12 top_mar1 mar-left5"><button id="j_idt574" name="j_idt574" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.ab({s:&quot;j_idt574&quot;,f:&quot;master_Layout_form&quot;,u:&quot;taxcollodc popup DimensionDialog ConfirmationDialog DeclarationDialog&quot;,onst:function(cfg){PF('masterLayoutVar').show();;},onsu:function(data,status,xhr){PF('masterLayoutVar').hide();;}});return false;" type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-calculator"></span><span class="ui-button-text ui-c">Calculate Fee</span></button><button id="Generate_Memo_btn" name="Generate_Memo_btn" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.bcn(this,event,[function(event){PF('DeclarationDLG').show();},function(event){PrimeFaces.ab({s:&quot;Generate_Memo_btn&quot;,f:&quot;master_Layout_form&quot;,p:&quot;taxcollodc&quot;});return false;}]);" type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-seek-next"></span><span class="ui-button-text ui-c">Generate Memo</span></button><button id="pay_fee" name="pay_fee" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.bcn(this,event,[function(event){PF('ConfirmationDLG').show();},function(event){PrimeFaces.ab({s:&quot;pay_fee&quot;,f:&quot;master_Layout_form&quot;,p:&quot;taxcollodc&quot;});return false;}]);" type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-seek-next"></span><span class="ui-button-text ui-c">Pay Fee</span></button><button id="j_idt575" name="j_idt575" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.ab({s:&quot;j_idt575&quot;,f:&quot;master_Layout_form&quot;,u:&quot;taxcollodc DimensionDialog ConfirmationDialog DeclarationDialog&quot;,onst:function(cfg){PF('masterLayoutVar').show();;},onsu:function(data,status,xhr){PF('masterLayoutVar').hide();;}});return false;" type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-refresh"></span><span class="ui-button-text ui-c">Reset</span></button><button id="j_idt576" name="j_idt576" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left" onclick="PrimeFaces.bcn(this,event,[function(event){PF('PermissibleDimensionDLG').show();},function(event){PrimeFaces.ab({s:&quot;j_idt576&quot;,f:&quot;master_Layout_form&quot;,p:&quot;PermissibleDimensionLimitDialog&quot;});return false;}]);" type="submit"><span class="ui-button-icon-left ui-icon ui-c ui-icon-newwin"></span><span class="ui-button-text ui-c">Show Permissbile Limit</span></button>
-                </div>
-            </div>
-        </div>
-    </div></div></div>
+<ul
+  id="operation_code_items"
+  class="ui-selectonemenu-items ui-selectonemenu-list ui-widget-content ui-widget ui-corner-all ui-helper-reset"
+  role="listbox"
+  aria-activedescendant="operation_code_1"
+>
+  <li
+    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
+    tabindex="-1"
+    role="option"
+    data-label="---Select Service Name---"
+    aria-selected="false"
+    id="operation_code_0"
+  >
+    ---Select Service Name---
+  </li>
+  <li
+    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all ui-state-highlight"
+    tabindex="-1"
+    role="option"
+    data-label="ADVANCE PAYMENT OF ODC EXEMPTION FEE"
+    aria-selected="true"
+    id="operation_code_1"
+  >
+    ADVANCE PAYMENT OF ODC EXEMPTION FEE
+  </li>
+  <li
+    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
+    tabindex="-1"
+    role="option"
+    data-label="PAYMENT OF PENDING ODC EXEMPTION FEE"
+    aria-selected="false"
+    id="operation_code_2"
+  >
+    PAYMENT OF PENDING ODC EXEMPTION FEE
+  </li>
+  <li
+    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
+    tabindex="-1"
+    role="option"
+    data-label="VEHICLE TAX COLLECTION (OTHER STATE)"
+    aria-selected="false"
+    id="operation_code_3"
+  >
+    VEHICLE TAX COLLECTION (OTHER STATE)
+  </li>
+</ul>

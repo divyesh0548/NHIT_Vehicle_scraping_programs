@@ -731,7 +731,6 @@ def scrape_vehicle_weights_chhattisgarh(df_input, skip_db_phases=False, remote_u
     finally:
         _thread_remote_url.value = None
 
-
 def _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases=False):
     # Make a copy to avoid modifying the original
     df = df_input.copy()
