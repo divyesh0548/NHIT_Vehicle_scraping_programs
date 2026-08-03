@@ -1,4 +1,7 @@
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,12 +13,44 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 import psycopg2
 from psycopg2 import extras
 from typing import Tuple
-from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+from config import (
+    DB_HOST,
+    DB_NAME,
+    DB_PASSWORD,
+    DB_PORT,
+    DB_USER,
+    MAX_SELENIUM_GRID_NODES,
+    SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_PROCESSING,
+    SELENIUM_REMOTE_URL,
+)
+from selenium_grid_manager import (
+    assert_grid_ready,
+    split_dataframe as split_df_for_grid,
+    start_managed_nodes,
+    stop_managed_nodes,
+    wait_for_grid_ready,
+)
 from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_number
 
 URL = "https://parivahan.gov.in/"
 WAIT_TIME = 30
 ELEMENT_WAIT = 15
+
+# Selenium Grid toggle:
+#   True  -> run browsers on Docker Selenium Grid (SELENIUM_REMOTE_URL from .env)
+#   False -> run a single local Chrome browser
+# An explicit remote_url passed to scrape_vehicle_details_for_permit() always overrides this.
+# Defaults to config SELENIUM_PROCESSING so main and standalone stay consistent.
+# On grid failure it falls back to local Chrome.
+USE_SELENIUM_GRID = SELENIUM_PROCESSING
+
+PERMIT_FIELDS = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
+
+# Per-thread remote URL so parallel Selenium Grid sessions each use their own node.
+_thread_remote_url = threading.local()
+
+
 def get_db_connection():
     """Create and return a PostgreSQL database connection"""
     try:
@@ -63,16 +98,19 @@ def check_and_restore_db_connection(conn):
         return conn
 
 
-def setup_driver():
+def setup_driver(remote_url=None):
+    """Create a Chrome WebDriver (local or Selenium Grid remote)."""
+    if remote_url is None:
+        remote_url = getattr(_thread_remote_url, "value", None)
     try:
         options = webdriver.ChromeOptions()
-        
+
         # Basic options
         options.add_argument('--disable-images')
         options.add_argument('--blink-settings=imagesEnabled=false')
         options.add_argument('--disable-gpu')
         options.page_load_strategy = 'normal'
-        
+
         # Stability and compatibility options
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
@@ -85,10 +123,10 @@ def setup_driver():
         options.add_argument('--remote-allow-origins=*')
         options.add_argument('--disable-web-security')
         options.add_argument('--allow-running-insecure-content')
-        
+
         # User agent to avoid detection
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
-        
+
         # Preferences
         prefs = {
             "profile.managed_default_content_settings.images": 2,
@@ -96,35 +134,36 @@ def setup_driver():
             "profile.default_content_settings.popups": 0
         }
         options.add_experimental_option("prefs", prefs)
-        # Removed excludeSwitches and useAutomationExtension as they might interfere with ChromeDriver
-        
-        # Try to create driver with service
-        try:
-            # First try with default service
-            driver = webdriver.Chrome(options=options)
-        except Exception as e1:
-            print(f"  [WARN] First attempt failed: {e1}")
-            print("  [INFO] Retrying with explicit service configuration...")
+
+        if remote_url:
+            from IHMCL_bot_selenium import ensure_grid_ready
+
+            ensure_grid_ready(remote_url)
+            driver = webdriver.Remote(command_executor=remote_url, options=options)
+            print(f"Browser connected to Selenium Grid: {remote_url}")
+        else:
+            # Try to create local driver with service
             try:
-                # Try with explicit service (handles ChromeDriver path issues)
-                service = Service()
-                driver = webdriver.Chrome(service=service, options=options)
-            except Exception as e2:
-                print(f"  [WARN] Second attempt failed: {e2}")
-                print("  [INFO] Retrying with minimal options...")
-                # Last resort: minimal options
-                minimal_options = webdriver.ChromeOptions()
-                minimal_options.add_argument('--no-sandbox')
-                minimal_options.add_argument('--disable-dev-shm-usage')
-                driver = webdriver.Chrome(options=minimal_options)
-        
+                driver = webdriver.Chrome(options=options)
+            except Exception as e1:
+                print(f"  [WARN] First attempt failed: {e1}")
+                print("  [INFO] Retrying with explicit service configuration...")
+                try:
+                    service = Service()
+                    driver = webdriver.Chrome(service=service, options=options)
+                except Exception as e2:
+                    print(f"  [WARN] Second attempt failed: {e2}")
+                    print("  [INFO] Retrying with minimal options...")
+                    minimal_options = webdriver.ChromeOptions()
+                    minimal_options.add_argument('--no-sandbox')
+                    minimal_options.add_argument('--disable-dev-shm-usage')
+                    driver = webdriver.Chrome(options=minimal_options)
+
         try:
             driver.maximize_window()
         except Exception as e:
             print(f"  [WARNING] Could not maximize window: {e}")
-            # Continue anyway - window might already be maximized
-        
-        # Verify driver is responsive (without JavaScript test to avoid Runtime.evaluate issues)
+
         try:
             _ = driver.current_url
             print("Browser launched successfully - Driver is responsive")
@@ -135,9 +174,9 @@ def setup_driver():
             except:
                 pass
             return None
-        
+
         return driver
-        
+
     except WebDriverException as e:
         print(f"Browser setup failed: {e}")
         import traceback
@@ -658,11 +697,115 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
         df.at[idx, field] = "none"
     return driver, wait, False
 
-def scrape_vehicle_details_for_permit(df_input):
+def scrape_vehicle_details_for_permit(df_input, remote_url=None, use_selenium_grid=None):
+    """
+    Scrape permit details for vehicles in df_input (Chhattisgarh checkpost tax UI).
+
+    use_selenium_grid: True  -> use Selenium Grid at SELENIUM_REMOTE_URL
+                       False -> use a local Chrome browser
+                       None  -> fall back to the module-level USE_SELENIUM_GRID flag
+    remote_url: explicit Selenium Grid URL (e.g. http://localhost:4444/wd/hub);
+                when set it overrides use_selenium_grid and forces grid usage.
+
+    Returns df with permit columns: Permit Type, Permit/Authorization No, Permit Validity.
+    """
+    if use_selenium_grid is None:
+        use_selenium_grid = USE_SELENIUM_GRID
+
+    # An explicit remote_url always forces grid usage.
+    use_grid = use_selenium_grid or (remote_url is not None)
+    grid_url = remote_url or SELENIUM_REMOTE_URL
+
     print("=" * 80)
     print("STARTING VEHICLE DETAILS SCRAPING")
     print("=" * 80)
 
+    if not use_grid:
+        print("Web scrape mode: local Chrome (single browser)")
+        return _scrape_chunk(df_input, None)
+
+    print(f"Web scrape mode: Selenium Grid ({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})")
+    return _run_grid_scrape(df_input, grid_url)
+
+
+def _scrape_chunk(chunk_df, remote_url):
+    """Run the scraping flow for one chunk with a per-thread remote URL (None = local Chrome)."""
+    _thread_remote_url.value = remote_url
+    try:
+        return _scrape_vehicle_details_for_permit_impl(chunk_df)
+    finally:
+        _thread_remote_url.value = None
+
+
+def _run_grid_scrape(df_input, remote_url):
+    """
+    Auto-start Chrome nodes (if enabled), split the work across parallel Grid sessions,
+    merge results, and fall back to local Chrome on failure. Mirrors the approach in
+    web_scrape_gujarat_Unladen_weight._run_grid_scrape / main_experimental_threading.
+    """
+    chunks = split_df_for_grid(df_input, MAX_SELENIUM_GRID_NODES)
+    if not chunks:
+        return df_input
+
+    print(f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url}", flush=True)
+
+    managed_nodes = []
+    merged = None
+    grid_error = None
+
+    try:
+        if SELENIUM_AUTO_MANAGE_NODES:
+            managed_nodes = start_managed_nodes(len(chunks))
+            wait_for_grid_ready(remote_url)
+        else:
+            assert_grid_ready(remote_url)
+
+        result_frames = []
+        failures = []
+        with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
+            future_to_chunk = {
+                executor.submit(_scrape_chunk, chunk, remote_url): chunk_id
+                for chunk_id, chunk in enumerate(chunks, start=1)
+            }
+            for future in as_completed(future_to_chunk):
+                chunk_id = future_to_chunk[future]
+                try:
+                    result_frames.append(future.result())
+                    print(f"  [SELENIUM GRID] chunk {chunk_id}/{len(chunks)} completed", flush=True)
+                except Exception as exc:
+                    failures.append((chunk_id, exc))
+                    print(f"  [SELENIUM GRID] chunk {chunk_id} failed: {exc}", flush=True)
+
+        if result_frames:
+            merged = df_input.copy()
+            for col in PERMIT_FIELDS:
+                if col not in merged.columns:
+                    merged[col] = ""
+            for frame in result_frames:
+                for col in frame.columns:
+                    merged.loc[frame.index, col] = frame[col]
+
+        if not result_frames:
+            grid_error = f"All Selenium Grid chunks failed: {failures}"
+        elif failures:
+            grid_error = f"{len(failures)} Selenium Grid chunk(s) failed: {failures}"
+
+    except Exception as exc:
+        grid_error = str(exc)
+        print(f"  [SELENIUM GRID] error: {exc}", flush=True)
+    finally:
+        if managed_nodes:
+            stop_managed_nodes(managed_nodes)
+
+    if grid_error:
+        print(f"  [SELENIUM GRID] falling back to local Chrome... ({grid_error})", flush=True)
+        df_for_local = merged if merged is not None else df_input
+        return _scrape_chunk(df_for_local, None)
+
+    return merged
+
+
+def _scrape_vehicle_details_for_permit_impl(df_input):
     # Make a copy to avoid modifying the original
     df = df_input.copy()
 
@@ -672,7 +815,7 @@ def scrape_vehicle_details_for_permit(df_input):
         if 'veh' in col.lower() and 'reg' in col.lower():
             veh_col = col
             break
-    
+
     if veh_col is None:
         print("[ERROR] Could not find vehicle number column in dataframe")
         return df
@@ -684,11 +827,10 @@ def scrape_vehicle_details_for_permit(df_input):
         return df
 
     # Initialize permit detail columns
-    permit_fields = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
-    for field in permit_fields:
+    for field in PERMIT_FIELDS:
         if field not in df.columns:
             df[field] = ""
-    print("Initialized permit columns: " + ", ".join(permit_fields))
+    print("Initialized permit columns: " + ", ".join(PERMIT_FIELDS))
 
     df[veh_col] = df[veh_col].apply(normalize_vehicle_number)
     invalid_vehicle_mask = ~df[veh_col].apply(is_vehicle_number_eligible)
@@ -699,10 +841,10 @@ def scrape_vehicle_details_for_permit(df_input):
             f"after cleanup (allowed lengths: 8, 9, 10)"
         )
         for idx in df[invalid_vehicle_mask].index:
-            for field in permit_fields:
+            for field in PERMIT_FIELDS:
                 df.at[idx, field] = "none"
-    
-    # Start browser
+
+    # Start browser (local or grid session via _thread_remote_url)
     driver = setup_driver()
     if not driver:
         print("[ERROR] Could not start browser — aborting")
@@ -717,7 +859,7 @@ def scrape_vehicle_details_for_permit(df_input):
 
     for nav_attempt in range(1, max_nav_attempts + 1):
         print(f"[Attempt {nav_attempt}/{max_nav_attempts}] Navigating to tax page...")
-        
+
         if navigate_to_tax_page(driver, wait):
             nav_success = True
             print("[OK] Navigation successful")
@@ -737,7 +879,10 @@ def scrape_vehicle_details_for_permit(df_input):
 
     if not nav_success:
         print("[ERROR] Could not navigate to tax page — aborting")
-        driver.quit()
+        try:
+            driver.quit()
+        except:
+            pass
         return df
 
     # Process all vehicles
@@ -747,33 +892,31 @@ def scrape_vehicle_details_for_permit(df_input):
     for idx, row in df.iterrows():
         vehicle_no = normalize_vehicle_number(row[veh_col])
         if not vehicle_no or not is_vehicle_number_eligible(vehicle_no):
-            # Mark skipped rows with "none" for consistency
-            permit_fields = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
-            for field in permit_fields:
+            for field in PERMIT_FIELDS:
                 if field not in df.columns:
                     df[field] = ""
                 df.at[idx, field] = "none"
             continue
 
-        # Process single vehicle
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)
 
         if success:
             scraped_count += 1
             print(f"Progress: {scraped_count}/{len(df)} scraped")
-        
+
         time.sleep(1)
 
-    driver.quit()
-    
-    # Calculate execution time
+    try:
+        driver.quit()
+    except:
+        pass
+
     elapsed = time.perf_counter() - start_time
     hrs = int(elapsed // 3600)
     mins = int((elapsed % 3600) // 60)
     secs = int(elapsed % 60)
     print(f"\nWeb scraping completed in {hrs:02d}:{mins:02d}:{secs:02d}")
 
-    # Summary
     print("\n" + "="*80)
     print("PROCESSING COMPLETE")
     print("="*80)
@@ -793,7 +936,7 @@ if __name__ == "__main__":
 
     print(f"Loaded {len(df_not_found)} vehicles from Excel (first sheet)")
 
-    # Scrape vehicle details
+    # Scrape vehicle details (grid when USE_SELENIUM_GRID / SELENIUM_PROCESSING is enabled)
     df_updated = scrape_vehicle_details_for_permit(df_not_found)
 
     # Save back to Excel - update first sheet only

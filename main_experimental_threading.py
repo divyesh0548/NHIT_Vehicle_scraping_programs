@@ -593,7 +593,7 @@ def process_excel_file(input_url, record_id):
         input_url_lc = (input_url or "").lower()
         is_ihmcl = "ihmcl" in filename_lc or "ihmcl" in input_url_lc
         if "permit" in filename_lc:
-            # Permit-specific scraping
+            # Permit scraping (Selenium Grid with local Chrome fallback, managed inside scraper)
             result_df = scrape_vehicle_details_for_permit(vehicle_df)
         elif is_ihmcl:
             # IHMCL FASTag portal automation (grid with local fallback)
