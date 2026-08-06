@@ -1,49 +1,1948 @@
-Services :
-
-<ul
-  id="operation_code_items"
-  class="ui-selectonemenu-items ui-selectonemenu-list ui-widget-content ui-widget ui-corner-all ui-helper-reset"
-  role="listbox"
-  aria-activedescendant="operation_code_1"
+<div
+  id="kltaxcollection"
+  class="ui-panel ui-widget ui-widget-content ui-corner-all bottom-space"
+  data-widget="widget_kltaxcollection"
+  role="region"
+  aria-labelledby="kltaxcollection_header"
 >
-  <li
-    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
-    tabindex="-1"
-    role="option"
-    data-label="---Select Service Name---"
-    aria-selected="false"
-    id="operation_code_0"
+  <div
+    id="kltaxcollection_header"
+    class="ui-panel-titlebar ui-widget-header ui-helper-clearfix ui-corner-all"
   >
-    ---Select Service Name---
-  </li>
-  <li
-    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all ui-state-highlight"
-    tabindex="-1"
-    role="option"
-    data-label="ADVANCE PAYMENT OF ODC EXEMPTION FEE"
-    aria-selected="true"
-    id="operation_code_1"
-  >
-    ADVANCE PAYMENT OF ODC EXEMPTION FEE
-  </li>
-  <li
-    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
-    tabindex="-1"
-    role="option"
-    data-label="PAYMENT OF PENDING ODC EXEMPTION FEE"
-    aria-selected="false"
-    id="operation_code_2"
-  >
-    PAYMENT OF PENDING ODC EXEMPTION FEE
-  </li>
-  <li
-    class="ui-selectonemenu-item ui-selectonemenu-list-item ui-corner-all"
-    tabindex="-1"
-    role="option"
-    data-label="VEHICLE TAX COLLECTION (OTHER STATE)"
-    aria-selected="false"
-    id="operation_code_3"
-  >
-    VEHICLE TAX COLLECTION (OTHER STATE)
-  </li>
-</ul>
+    <span class="ui-panel-title">Tax Payment Details</span>
+  </div>
+  <div id="kltaxcollection_content" class="ui-panel-content ui-widget-content">
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-6">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt173"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Vehicle No.</span></label
+          > </label
+        ><input
+          id="j_idt175"
+          name="j_idt175"
+          type="text"
+          value="MP20ZE1400"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="10"
+          onkeypress="
+            return AlphaOnly(event, 'abcdefghijklmnopqrstuvwxyz0123456789');
+          "
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+      <div class="ui-grid-col-6">
+        <div class="ui-grid-row">
+          <div class="ui-grid-col-12 top_mar1 mar-left5">
+            <button
+              id="j_idt177"
+              name="j_idt177"
+              class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left ui-state-disabled"
+              onclick="
+                PrimeFaces.ab({
+                  s: 'j_idt177',
+                  f: 'master_Layout_form',
+                  u: 'kltaxcollection ConfirmationDialog popup',
+                  onst: function (cfg) {
+                    PF('masterLayoutVar').show();
+                  },
+                  onsu: function (data, status, xhr) {
+                    PF('masterLayoutVar').hide();
+                  },
+                });
+                return false;
+              "
+              title="Click to get owner and vehicle details from Vahan 4."
+              type="submit"
+              disabled="disabled"
+            >
+              <span
+                class="ui-button-icon-left ui-icon ui-c ui-icon-arrowthick-1-s"
+              ></span
+              ><span class="ui-button-text ui-c">Get Details</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt179"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Chassis No.</span></label
+          > </label
+        ><input
+          id="j_idt181"
+          name="j_idt181"
+          type="text"
+          value="MAT828048P2K*****"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="30"
+          onkeypress="return AlphaOnly(event, '*#.0123456789');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt183"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Mobile No.</span></label
+          > </label
+        ><input
+          id="mobileno"
+          name="mobileno"
+          type="text"
+          value="98936****2"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="10"
+          placeholder="SMS about payment will be sent to this number."
+          title="SMS about payment will be sent to this number."
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-6">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt186"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Owner Name</span></label
+          > </label
+        ><input
+          id="j_idt188"
+          name="j_idt188"
+          type="text"
+          value="P*****P S***H C***A"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="50"
+          onkeypress="return AlphaWithSpaceOnly(event, '. ');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt190"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">District Name</span></label
+          >
+        </label>
+        <div
+          id="j_idt192"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 193.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt192_input"
+              name="j_idt192_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'j_idt192',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" selected="selected" data-escape="true">
+                ---Select District---
+              </option>
+              <option value="6" data-escape="true">IDUKKI</option>
+              <option value="13" data-escape="true">KANNUR</option>
+              <option value="14" data-escape="true">KASARGODE</option>
+              <option value="2" data-escape="true">KOLLAM</option>
+              <option value="10" data-escape="true">MALAPPURAM</option>
+              <option value="9" data-escape="true">PALAKKAD</option>
+              <option value="1" data-escape="true">THIRUVANANTHAPURAM</option>
+              <option value="12" data-escape="true">WAYANAD</option>
+            </select>
+          </div>
+          <span
+            id="j_idt192_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt192_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select District---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt192_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="j_idt196" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Checkpost Name</span></label
+          >
+        </label>
+        <div
+          id="cmb_checkpost_name"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 202.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_checkpost_name_input"
+              name="cmb_checkpost_name_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" selected="selected" data-escape="true">
+                ---Select Checkpost Name---
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_checkpost_name_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_checkpost_name_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Checkpost Name---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_checkpost_name_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt201"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">From State</span></label
+          >
+        </label>
+        <div
+          id="j_idt203"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 182.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt203_input"
+              name="j_idt203_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'j_idt203',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" data-escape="true">---Select State---</option>
+              <option value="AN" data-escape="true">
+                ANDAMAN &amp; NICOBAR
+              </option>
+              <option value="AP" data-escape="true">ANDHRA PRADESH</option>
+              <option value="AR" data-escape="true">ARUNACHAL PRADESH</option>
+              <option value="AS" data-escape="true">ASSAM</option>
+              <option value="BR" data-escape="true">BIHAR</option>
+              <option value="CH" data-escape="true">CHANDIGARH</option>
+              <option value="CG" data-escape="true">CHHATTISGARH</option>
+              <option value="DL" data-escape="true">DELHI</option>
+              <option value="GA" data-escape="true">GOA</option>
+              <option value="GJ" data-escape="true">GUJARAT</option>
+              <option value="HR" data-escape="true">HARYANA</option>
+              <option value="HP" data-escape="true">HIMACHAL PRADESH</option>
+              <option value="JK" data-escape="true">JAMMU &amp; KASHMIR</option>
+              <option value="JH" data-escape="true">JHARKHAND</option>
+              <option value="KA" data-escape="true">KARNATAKA</option>
+              <option value="LD" data-escape="true">LAKSHADWEEP</option>
+              <option value="MP" selected="selected" data-escape="true">
+                MADHYA PRADESH
+              </option>
+              <option value="MH" data-escape="true">MAHARASHTRA</option>
+              <option value="MN" data-escape="true">MANIPUR</option>
+              <option value="ML" data-escape="true">MEGHALAYA</option>
+              <option value="MZ" data-escape="true">MIZORAM</option>
+              <option value="NL" data-escape="true">NAGALAND</option>
+              <option value="OR" data-escape="true">ODISHA</option>
+              <option value="PY" data-escape="true">PONDICHERRY</option>
+              <option value="PB" data-escape="true">PUNJAB</option>
+              <option value="RJ" data-escape="true">RAJASTHAN</option>
+              <option value="SK" data-escape="true">SIKKIM</option>
+              <option value="TN" data-escape="true">TAMIL NADU</option>
+              <option value="TS" data-escape="true">TELANGANA</option>
+              <option value="TR" data-escape="true">TRIPURA</option>
+              <option value="DD" data-escape="true">UT of DNH and DD</option>
+              <option value="UP" data-escape="true">UTTAR PRADESH</option>
+              <option value="UK" data-escape="true">UTTRAKHAND</option>
+              <option value="WB" data-escape="true">WEST BENGAL</option>
+            </select>
+          </div>
+          <span
+            id="j_idt203_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt203_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >MADHYA PRADESH</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt203_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt207"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Issuing Authority.</span></label
+          >
+        </label>
+        <div
+          id="j_idt209"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 198.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt209_input"
+              name="j_idt209_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">
+                ---Select Issuing Authority---
+              </option>
+              <option value="69" data-escape="true">ALIRAJPUR DTO</option>
+              <option value="65" data-escape="true">ANUPPUR DTO</option>
+              <option value="67" data-escape="true">ASHOKNAGAR DTO</option>
+              <option value="46" data-escape="true">BADWANI DTO</option>
+              <option value="50" data-escape="true">BALAGHAT DTO</option>
+              <option value="48" data-escape="true">BETUL DTO</option>
+              <option value="30" data-escape="true">BHIND DTO</option>
+              <option value="4" data-escape="true">BHOPAL RTO</option>
+              <option value="68" data-escape="true">BURHANPUR DTO</option>
+              <option value="16" data-escape="true">CHATTARPUR ARTO</option>
+              <option value="28" data-escape="true">CHHINDWARA ARTO</option>
+              <option value="34" data-escape="true">DAMOH DTO</option>
+              <option value="32" data-escape="true">DATIA DTO</option>
+              <option value="41" data-escape="true">DEWAS DTO</option>
+              <option value="11" data-escape="true">DHAR ARTO</option>
+              <option value="52" data-escape="true">DINDORI DTO</option>
+              <option value="8" data-escape="true">GUNA DTO</option>
+              <option value="7" data-escape="true">GWALIOR RTO</option>
+              <option value="47" data-escape="true">HARDA DTO</option>
+              <option value="5" data-escape="true">HOSANGABAD DTO</option>
+              <option value="9" data-escape="true">INDORE RTO</option>
+              <option value="20" selected="selected" data-escape="true">
+                JABALPUR RTO
+              </option>
+              <option value="45" data-escape="true">JHABUA DTO</option>
+              <option value="21" data-escape="true">KATNI ARTO</option>
+              <option value="12" data-escape="true">KHANDWA ARTO</option>
+              <option value="10" data-escape="true">KHARGONE ARTO</option>
+              <option value="70" data-escape="true">MALWA RTO</option>
+              <option value="51" data-escape="true">MANDLA DTO</option>
+              <option value="14" data-escape="true">MANDSAUR ARTO</option>
+              <option value="6" data-escape="true">MORENA DTO</option>
+              <option value="49" data-escape="true">NARSINGHPUR DTO</option>
+              <option value="44" data-escape="true">NEEMUCH DTO</option>
+              <option value="35" data-escape="true">PANNA DTO</option>
+              <option value="38" data-escape="true">RAISEN DTO</option>
+              <option value="39" data-escape="true">RAJGARH DTO</option>
+              <option value="43" data-escape="true">RATLAM DTO</option>
+              <option value="17" data-escape="true">REWA RTO</option>
+              <option value="15" data-escape="true">SAGAR RTO</option>
+              <option value="19" data-escape="true">SATNA ARTO</option>
+              <option value="37" data-escape="true">SEHORE DTO</option>
+              <option value="22" data-escape="true">SEONI ARTO</option>
+              <option value="18" data-escape="true">SHAHDOL RTO</option>
+              <option value="42" data-escape="true">SHAJAPUR DTO</option>
+              <option value="31" data-escape="true">SHEOPUR DTO</option>
+              <option value="33" data-escape="true">SHIVPURI DTO</option>
+              <option value="53" data-escape="true">SIDHI DTO</option>
+              <option value="66" data-escape="true">SINGROLI DTO</option>
+              <option value="36" data-escape="true">TIKAMGARH DTO</option>
+              <option value="13" data-escape="true">UJJAIN RTO</option>
+              <option value="54" data-escape="true">UMARIA DTO</option>
+              <option value="40" data-escape="true">VIDISHA DTO</option>
+            </select>
+          </div>
+          <span
+            id="j_idt209_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt209_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >JABALPUR RTO</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt209_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt213"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Vehicle Type</span></label
+          >
+        </label>
+        <div
+          id="j_idt215"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 342.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt215_input"
+              name="j_idt215_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'j_idt215',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" data-escape="true">
+                ---Select Vehicle Type---
+              </option>
+              <option value="1" data-escape="true">
+                CONTRACT CARRIAGE/PASSENGER VEHICLES
+              </option>
+              <option value="3" selected="selected" data-escape="true">
+                GOODS VEHICLE
+              </option>
+              <option value="9" data-escape="true">
+                CONSTRUCTION EQUIPMENT VEHICLE
+              </option>
+            </select>
+          </div>
+          <span
+            id="j_idt215_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt215_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >GOODS VEHICLE</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt215_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt219"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Vehicle Class</span></label
+          >
+        </label>
+        <div
+          id="j_idt221"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 206.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt221_input"
+              name="j_idt221_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'j_idt221',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" data-escape="true">
+                ---Select Vehicle Class---
+              </option>
+              <option value="58" data-escape="true">
+                THREE WHEELER(GOODS)
+              </option>
+              <option value="89" selected="selected" data-escape="true">
+                TRAILER
+              </option>
+              <option value="68" data-escape="true">MOBILE CANTEEN</option>
+              <option value="66" data-escape="true">LIBRARY VAN</option>
+              <option value="64" data-escape="true">MOBILE CLINIC</option>
+              <option value="65" data-escape="true">X-RAY VAN</option>
+              <option value="79" data-escape="true">CASH VAN</option>
+              <option value="84" data-escape="true">ARTICULATED VEHICLE</option>
+              <option value="78" data-escape="true">
+                CAMPER VAN / TRAILER
+              </option>
+              <option value="59" data-escape="true">GOODS CARRIERS</option>
+              <option value="87" data-escape="true">DUMPER</option>
+            </select>
+          </div>
+          <span
+            id="j_idt221_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt221_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >TRAILER</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt221_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt225"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Vehicle Category</span></label
+          >
+        </label>
+        <div
+          id="cmb_vehicle_catg"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 201.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_vehicle_catg_input"
+              name="cmb_vehicle_catg_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">
+                ---Select Vehicle Category---
+              </option>
+              <option value="HGV" selected="selected" data-escape="true">
+                HEAVY GOODS VEHICLE
+              </option>
+              <option value="LGV" data-escape="true">
+                LIGHT GOODS VEHICLE
+              </option>
+              <option value="MGV" data-escape="true">
+                MEDIUM GOODS VEHICLE
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_vehicle_catg_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_vehicle_catg_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >HEAVY GOODS VEHICLE</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_vehicle_catg_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_dl_number"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">DL Number</span></label
+          > </label
+        ><input
+          id="txt_dl_number"
+          name="txt_dl_number"
+          type="text"
+          value=""
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="30"
+          onkeypress="
+            return AlphaOnly(event, 'abcdefghijklmnopqrstuvwxyz0123456789');
+          "
+          onkeyup="makeCaps(this)"
+          onblur="
+            PrimeFaces.ab({
+              s: 'txt_dl_number',
+              e: 'blur',
+              f: 'master_Layout_form',
+              p: 'txt_dl_number',
+              u: 'txt_dr_name cal_dl_vali',
+            })
+          "
+        />
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_gvw"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label"
+              >Gross Vehicle Weight(In Kg.)</span
+            ></label
+          > </label
+        ><input
+          id="txt_laden_wt"
+          name="txt_laden_wt"
+          type="text"
+          value="18500"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="10"
+          onkeypress="return NumericOnly(event, '');"
+          onblur="
+            PrimeFaces.ab({
+              s: 'txt_laden_wt',
+              e: 'blur',
+              f: 'master_Layout_form',
+              p: 'txt_laden_wt',
+              u: 'cal_permit_vali cmb_permit_type cmb_permit_catg popup',
+            })
+          "
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_distance"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Unladen Wt(In Kg.)</span></label
+          > </label
+        ><input
+          id="txt_distance"
+          name="txt_distance"
+          type="text"
+          value="13200"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="10"
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt236"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Driver Name</span></label
+          > </label
+        ><input
+          id="txt_dr_name"
+          name="txt_dr_name"
+          type="text"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="150"
+          onkeypress="return AlphaWithSpaceOnly(event, '. ');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt239"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">DL Valid Upto</span></label
+          > </label
+        ><span id="cal_dl_vali" class="ui-calendar"
+          ><input
+            id="cal_dl_vali_input"
+            name="cal_dl_vali_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"> </label>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="j_idt244" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Pushback seats</span></label
+          > </label
+        ><input
+          id="pushback_cap"
+          name="pushback_cap"
+          type="text"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="2"
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_tipper_body"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Tipper Body</span></label
+          >
+        </label>
+        <div
+          id="j_idt248"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 161.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt248_input"
+              name="j_idt248_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'j_idt248',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection popup',
+                })
+              "
+            >
+              <option value="-1" selected="selected" data-escape="true">
+                ---Select Body Type---
+              </option>
+              <option value="0" data-escape="true">NOT APPLICABLE</option>
+              <option value="Y" data-escape="true">YES</option>
+              <option value="N" data-escape="true">NO</option>
+            </select>
+          </div>
+          <span
+            id="j_idt248_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt248_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Body Type---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt248_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt254"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Name of Goods</span></label
+          >
+        </label>
+        <div
+          id="j_idt256"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 193.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt256_input"
+              name="j_idt256_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">
+                ---Select Name of Goods---
+              </option>
+              <option value="1" data-escape="true">RICE</option>
+              <option value="2" data-escape="true">WHEAT</option>
+              <option value="3" data-escape="true">FLOUR</option>
+              <option value="4" data-escape="true">PULSES</option>
+              <option value="5" data-escape="true">SUGAR</option>
+              <option value="6" data-escape="true">SALT</option>
+              <option value="7" data-escape="true">MILK</option>
+              <option value="8" data-escape="true">EDIBLE OIL</option>
+              <option value="9" data-escape="true">BIG ONION</option>
+              <option value="10" data-escape="true">SMALL ONION</option>
+              <option value="11" data-escape="true">POTATO</option>
+              <option value="12" data-escape="true">TOMATO</option>
+              <option value="13" data-escape="true">REDCHILLY</option>
+              <option value="14" data-escape="true">VEGETABLES</option>
+              <option value="15" data-escape="true">BANANA</option>
+              <option value="16" data-escape="true">ORANGE</option>
+              <option value="17" data-escape="true">APPLE</option>
+              <option value="18" data-escape="true">WATERMELON</option>
+              <option value="19" data-escape="true">LPG BULLET</option>
+              <option value="20" data-escape="true">LPG CYLINDER</option>
+              <option value="21" data-escape="true">CHICKEN</option>
+              <option value="22" data-escape="true">EGG</option>
+              <option value="23" data-escape="true">FISH</option>
+              <option value="24" data-escape="true">CATTLEFEED</option>
+              <option value="25" data-escape="true">POULTRY FEED</option>
+              <option value="37" data-escape="true">CEMENT</option>
+              <option value="27" data-escape="true">STEEL</option>
+              <option value="28" data-escape="true">FLYASH</option>
+              <option value="29" data-escape="true">BRICKS</option>
+              <option value="30" data-escape="true">HOLLOW BLOCK</option>
+              <option value="31" data-escape="true">METAL</option>
+              <option value="32" data-escape="true">SAND</option>
+              <option value="33" data-escape="true">ACID</option>
+              <option value="34" data-escape="true">M/CYCLE</option>
+              <option value="35" data-escape="true">M/CAR</option>
+              <option value="36" data-escape="true">AUTOSPARES</option>
+              <option value="38" data-escape="true">BUILDING MATERIALS</option>
+              <option value="39" data-escape="true">OTHERS</option>
+              <option value="40" data-escape="true">NOT APPLICABLE</option>
+            </select>
+          </div>
+          <span
+            id="j_idt256_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt256_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Name of Goods---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt256_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="j_idt260" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Ordinary seats</span></label
+          > </label
+        ><input
+          id="ordinary_cap"
+          name="ordinary_cap"
+          type="text"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="2"
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_ev_permit"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Permit</span></label
+          >
+        </label>
+        <div
+          id="j_idt264"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 136px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt264_input"
+              name="j_idt264_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" selected="selected" data-escape="true">
+                ---Select Permit---
+              </option>
+            </select>
+          </div>
+          <span
+            id="j_idt264_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt264_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Permit---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt264_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="lbl_permit_no" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Base Permit No</span></label
+          > </label
+        ><input
+          id="txt_permit_no"
+          name="txt_permit_no"
+          type="text"
+          value="MP2023-NP-7012A"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="50"
+          onkeypress="return AlphaOnly(event, '*#/.0123456789');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt270"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Permit Type</span></label
+          >
+        </label>
+        <div
+          id="cmb_permit_type"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 170.667px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_permit_type_input"
+              name="cmb_permit_type_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'cmb_permit_type',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection popup',
+                })
+              "
+            >
+              <option value="-1" data-escape="true">
+                ---Select Permit Type---
+              </option>
+              <option value="105" data-escape="true">GOODS PERMIT</option>
+            </select>
+          </div>
+          <span
+            id="cmb_permit_type_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_permit_type_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Permit Type---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_permit_type_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt275"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Permit Category</span></label
+          >
+        </label>
+        <div
+          id="cmb_permit_catg"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 196px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_permit_catg_input"
+              name="cmb_permit_catg_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'cmb_permit_catg',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" data-escape="true">
+                ---Select Permit Category---
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_permit_catg_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_permit_catg_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Permit Category---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_permit_catg_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-6">
+        <label class="field-label resp-label-section"
+          ><label id="lbl_route" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Route</span></label
+          > </label
+        ><input
+          id="txt_route"
+          name="txt_route"
+          type="text"
+          value=""
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="200"
+          onkeypress="return AlphaWithSpaceOnly(event, '. ');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="lbl_height" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label"
+              >Floor Area(In Meter)</span
+            ></label
+          > </label
+        ><input
+          id="txt_floor"
+          name="txt_floor"
+          type="text"
+          value="0"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="6"
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="lbl_cc" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Cubic Cap(CC)</span></label
+          > </label
+        ><input
+          id="txt_cc"
+          name="txt_cc"
+          type="text"
+          value="6702"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="10"
+          onkeypress="return NumericOnly(event, '');"
+        />
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt286"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Service Type</span></label
+          >
+        </label>
+        <div
+          id="cmb_service_type"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 176px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_service_type_input"
+              name="cmb_service_type_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">
+                ---Select Service Type---
+              </option>
+              <option value="0" selected="selected" data-escape="true">
+                NOT APPLICABLE
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_service_type_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_service_type_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >NOT APPLICABLE</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_service_type_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label id="j_idt291" class="ui-outputlabel ui-widget"
+            ><span class="ui-outputlabel-label">Sale Amount</span></label
+          > </label
+        ><input
+          id="txt_sale_amount"
+          name="txt_sale_amount"
+          type="text"
+          value="3943272"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled"
+          disabled="disabled"
+          autocomplete="off"
+          maxlength="9"
+          onkeypress="return NumericOnly(event, '');"
+          onkeyup="makeCaps(this)"
+        />
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt294"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Registration Type</span></label
+          >
+        </label>
+        <div
+          id="cmb_regn_type"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 369.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_regn_type_input"
+              name="cmb_regn_type_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">
+                ---Select Registration Type---
+              </option>
+              <option value="A" data-escape="true">
+                EX-ARMY/AUCTION VEHICLE
+              </option>
+              <option value="C" data-escape="true">
+                NEW REGN AGAINST AUCTION/CONFISCATED VEH
+              </option>
+              <option value="D" data-escape="true">
+                CD/EMBASSY/FOREIGN VEHICLE
+              </option>
+              <option value="N" data-escape="true">NEW</option>
+              <option value="O" data-escape="true">OTHER STATE VEHICLE</option>
+              <option value="R" data-escape="true">
+                OTHER RTO/MLO/ARTO/DTO/Region Vehicle
+              </option>
+              <option value="S" data-escape="true">
+                NEW REGN AGAINST SCRAPPED VEHICLE
+              </option>
+              <option value="T" selected="selected" data-escape="true">
+                TEMPORARY REGISTERED VEHICLE
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_regn_type_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_regn_type_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >TEMPORARY REGISTERED VEHICLE</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_regn_type_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt299"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label"
+              >AITP Permit Validity</span
+            ></label
+          > </label
+        ><span id="aitp_permit_upto" class="ui-calendar"
+          ><input
+            id="aitp_permit_upto_input"
+            name="aitp_permit_upto_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt302"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Insurance Validity</span></label
+          > </label
+        ><span
+          id="cal_insurance_vali"
+          class="ui-calendar ui-inputwrapper-filled"
+          ><input
+            id="cal_insurance_vali_input"
+            name="cal_insurance_vali_input"
+            type="text"
+            value="24-10-2026"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt305"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Tax Validity</span></label
+          > </label
+        ><span id="cal_tax_vali" class="ui-calendar"
+          ><input
+            id="cal_tax_vali_input"
+            name="cal_tax_vali_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt308"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label"
+              >Basic Permit Validity</span
+            ></label
+          > </label
+        ><span id="cal_permit_vali" class="ui-calendar ui-inputwrapper-filled"
+          ><input
+            id="cal_permit_vali_input"
+            name="cal_permit_vali_input"
+            type="text"
+            value="22-11-2028"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt311"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Fitness Validity</span></label
+          > </label
+        ><span id="cal_fitness_vali" class="ui-calendar ui-inputwrapper-filled"
+          ><input
+            id="cal_fitness_vali_input"
+            name="cal_fitness_vali_input"
+            type="text"
+            value="09-11-2027"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt314"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label"
+              >Green Tax Paid upto Date</span
+            ></label
+          > </label
+        ><span id="green_tax" class="ui-calendar"
+          ><input
+            id="green_tax_input"
+            name="green_tax_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY HH:mm"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt317"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Cess Paid Date</span></label
+          > </label
+        ><span id="cess" class="ui-calendar"
+          ><input
+            id="cess_input"
+            name="cess_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY HH:mm"
+            disabled=""
+        /></span>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt320"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">PUCC valid up to</span></label
+          > </label
+        ><span id="cal_pucc_val_upto" class="ui-calendar"
+          ><input
+            id="cal_pucc_val_upto_input"
+            name="cal_pucc_val_upto_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY HH:mm"
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt323"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label"
+              >Authorization valid up to</span
+            ></label
+          > </label
+        ><span id="cal_auth_val_upto" class="ui-calendar"
+          ><input
+            id="cal_auth_val_upto_input"
+            name="cal_auth_val_upto_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+        /></span>
+      </div>
+      <div class="ui-grid-col-6">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt326"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Tax Mode</span></label
+          >
+        </label>
+        <div
+          id="cmb_payment_mode"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 156px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="cmb_payment_mode_input"
+              name="cmb_payment_mode_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+              onchange="
+                PrimeFaces.ab({
+                  s: 'cmb_payment_mode',
+                  e: 'change',
+                  f: 'master_Layout_form',
+                  p: 'kltaxcollection',
+                  u: 'kltaxcollection',
+                })
+              "
+            >
+              <option value="-1" selected="selected" data-escape="true">
+                ---Select Tax Mode---
+              </option>
+            </select>
+          </div>
+          <span
+            id="cmb_payment_mode_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="cmb_payment_mode_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >---Select Tax Mode---</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="cmb_payment_mode_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt331"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Registration Date</span></label
+          > </label
+        ><span id="cal_regn_dt" class="ui-calendar ui-inputwrapper-filled"
+          ><input
+            id="cal_regn_dt_input"
+            name="cal_regn_dt_input"
+            type="text"
+            value="20-11-2023"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled ui-state-filled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="lbl_fuel"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Fuel</span></label
+          >
+        </label>
+        <div
+          id="j_idt335"
+          class="ui-selectonemenu ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          style="min-width: 137.333px"
+        >
+          <div class="ui-helper-hidden-accessible">
+            <select
+              id="j_idt335_input"
+              name="j_idt335_input"
+              tabindex="-1"
+              autocomplete="off"
+              aria-hidden="true"
+              disabled="disabled"
+            >
+              <option value="-1" data-escape="true">---Select Fuel---</option>
+              <option value="6" data-escape="true">CNG ONLY</option>
+              <option value="2" selected="selected" data-escape="true">
+                DIESEL
+              </option>
+              <option value="12" data-escape="true">DIESEL/HYBRID</option>
+              <option value="4" data-escape="true">ELECTRIC(BOV)</option>
+              <option value="13" data-escape="true">ETHANOL</option>
+              <option value="8" data-escape="true">LPG ONLY</option>
+              <option value="99" data-escape="true">OTHERS</option>
+              <option value="1" data-escape="true">PETROL</option>
+              <option value="3" data-escape="true">PETROL/CNG</option>
+              <option value="11" data-escape="true">PETROL/HYBRID</option>
+              <option value="5" data-escape="true">PETROL/LPG</option>
+              <option value="10" data-escape="true">SOLAR</option>
+            </select>
+          </div>
+          <span
+            id="j_idt335_label"
+            class="ui-selectonemenu-label ui-inputfield ui-corner-all"
+            tabindex="0"
+            aria-controls="j_idt335_panel"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            disabled="disabled"
+            >DIESEL</span
+          >
+          <div
+            class="ui-selectonemenu-trigger ui-state-default ui-corner-right"
+          >
+            <span class="ui-icon ui-icon-triangle-1-s ui-c"></span>
+          </div>
+          <div
+            id="j_idt335_panel"
+            class="ui-selectonemenu-panel ui-widget ui-widget-content ui-corner-all ui-helper-hidden ui-shadow ui-input-overlay"
+            tabindex="-1"
+          >
+            <div
+              class="ui-selectonemenu-items-wrapper"
+              style="max-height: 200px"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt339"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Tax From Date</span></label
+          > </label
+        ><span id="cal_tax_from" class="ui-calendar"
+          ><input
+            id="cal_tax_from_input"
+            name="cal_tax_from_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY HH:mm"
+            disabled=""
+        /></span>
+      </div>
+      <div class="ui-grid-col-3">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt342"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Tax Upto Date</span></label
+          > </label
+        ><span id="cal_tax_to" class="ui-calendar"
+          ><input
+            id="cal_tax_to_input"
+            name="cal_tax_to_input"
+            type="text"
+            class="ui-inputfield ui-widget ui-state-default ui-corner-all ui-state-disabled hasDatepicker"
+            autocomplete="off"
+            placeholder="DD-MM-YYYY HH:mm"
+            disabled=""
+        /></span>
+      </div>
+    </div>
+    <div class="ui-grid-row"></div>
+    <p style="color: #ee0000; font-weight: bold">
+      For 7 days select WEEKLY and for 30 days select MONTHLY
+    </p>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-12">
+        <div id="tax_table" class="ui-datatable ui-widget">
+          <div class="ui-datatable-tablewrapper">
+            <table role="grid">
+              <thead id="tax_table_head">
+                <tr>
+                  <th
+                    id="tax_table:j_idt345"
+                    class="ui-state-default"
+                    aria-label="Sl. No."
+                    scope="col"
+                    style="width: 40px"
+                  >
+                    <span class="ui-column-title">Sl. No.</span>
+                  </th>
+                  <th
+                    id="tax_table:j_idt347"
+                    class="ui-state-default"
+                    aria-label="Particulars"
+                    scope="col"
+                  >
+                    <span class="ui-column-title">Particulars</span>
+                  </th>
+                  <th
+                    id="tax_table:j_idt349"
+                    class="ui-state-default"
+                    aria-label="Tax From"
+                    scope="col"
+                  >
+                    <span class="ui-column-title">Tax From</span>
+                  </th>
+                  <th
+                    id="tax_table:j_idt351"
+                    class="ui-state-default"
+                    aria-label="Tax Upto"
+                    scope="col"
+                  >
+                    <span class="ui-column-title">Tax Upto</span>
+                  </th>
+                  <th
+                    id="tax_table:j_idt353"
+                    class="ui-state-default"
+                    aria-label="Amount"
+                    scope="col"
+                  >
+                    <span class="ui-column-title">Amount</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody
+                id="tax_table_data"
+                class="ui-datatable-data ui-widget-content"
+              >
+                <tr class="ui-widget-content ui-datatable-empty-message">
+                  <td colspan="5">No records found.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ui-grid-row">
+      <div class="ui-grid-col-6">
+        <label class="field-label resp-label-section"
+          ><label
+            id="j_idt356"
+            class="ui-outputlabel ui-widget field-label-mandate"
+            ><span class="ui-outputlabel-label">Total Amount</span></label
+          > </label
+        ><input
+          id="txt_tax_amount"
+          name="txt_tax_amount"
+          type="text"
+          style="font-size: 15pt; font-weight: bold"
+          class="ui-inputfield ui-inputtext ui-widget ui-state-default ui-corner-all ui-state-disabled"
+          disabled="disabled"
+        />
+      </div>
+      <div class="ui-grid-col-6">
+        <div class="ui-grid-row">
+          <div class="ui-grid-col-12 top_mar1 mar-left5">
+            <button
+              id="j_idt359"
+              name="j_idt359"
+              class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left"
+              onclick="
+                PrimeFaces.ab({
+                  s: 'j_idt359',
+                  f: 'master_Layout_form',
+                  u: 'kltaxcollection popup ConfirmationDialog',
+                  onst: function (cfg) {
+                    PF('masterLayoutVar').show();
+                  },
+                  onco: function (xhr, status, args, data) {
+                    PF('masterLayoutVar').hide();
+                  },
+                });
+                return false;
+              "
+              type="submit"
+            >
+              <span
+                class="ui-button-icon-left ui-icon ui-c ui-icon-calculator"
+              ></span
+              ><span class="ui-button-text ui-c">Calculate Tax</span></button
+            ><button
+              id="j_idt360"
+              name="j_idt360"
+              class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left"
+              onclick="
+                PrimeFaces.bcn(this, event, [
+                  function (event) {
+                    PF('ConfirmationDLG').show();
+                  },
+                  function (event) {
+                    PrimeFaces.ab({ s: 'j_idt360', f: 'master_Layout_form' });
+                    return false;
+                  },
+                ])
+              "
+              type="submit"
+            >
+              <span
+                class="ui-button-icon-left ui-icon ui-c ui-icon-seek-next"
+              ></span
+              ><span class="ui-button-text ui-c">Pay Tax</span></button
+            ><button
+              id="j_idt361"
+              name="j_idt361"
+              class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-icon-left"
+              onclick="
+                PrimeFaces.ab({
+                  s: 'j_idt361',
+                  f: 'master_Layout_form',
+                  u: 'kltaxcollection ConfirmationDialog',
+                  onst: function (cfg) {
+                    PF('masterLayoutVar').show();
+                  },
+                  onsu: function (data, status, xhr) {
+                    PF('masterLayoutVar').hide();
+                  },
+                });
+                return false;
+              "
+              type="submit"
+            >
+              <span
+                class="ui-button-icon-left ui-icon ui-c ui-icon-refresh"
+              ></span
+              ><span class="ui-button-text ui-c">Reset</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

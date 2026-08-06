@@ -50,8 +50,8 @@ def divide_excel_file(input_path, num_parts, output_dir=None, sheet_name=0):
 
 if __name__ == "__main__":
     # Edit these, then run: python divide_excel_file.py
-    INPUT_PATH = r"CHeckpost_Dukkavanipalem_20260605_094953.xlsx"
-    NUM_PARTS = 3
+    INPUT_PATH = r"kerala checkpost run.xlsx"
+    NUM_PARTS = 5
     OUTPUT_DIR = None  # None = same folder as INPUT_PATH; else set a folder path string
 
     paths = divide_excel_file(INPUT_PATH, NUM_PARTS, output_dir=OUTPUT_DIR)

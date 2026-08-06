@@ -693,15 +693,24 @@ def main(
         
         print(f"Found vehicle number column: '{vehicle_col}'")
         
-        # Add 'processed' column if it doesn't exist
+        # Add 'processed' column if it doesn't exist and persist it immediately
+        # (otherwise a captcha failure before any save leaves the Excel without this column)
         if 'processed' not in df.columns:
             df['processed'] = ''
             print("Added 'processed' column to input file")
-        
+            df.to_excel(input_excel_file, index=False)
+
+        def _pending_mask(frame):
+            """Rows not yet marked Done (handles missing/NaN processed values)."""
+            if 'processed' not in frame.columns:
+                return pd.Series(True, index=frame.index)
+            status = frame['processed'].fillna('').astype(str).str.strip().str.lower()
+            return status != 'done'
+
         # Main processing loop with restart capability
         while restart_count <= max_restarts:
             # Filter out already processed vehicles
-            pending_df = df[df['processed'].str.strip().str.lower() != 'done'].copy()
+            pending_df = df[_pending_mask(df)].copy()
             print(f"\n{'='*60}")
             print(f"Found {len(pending_df)} vehicles to process (out of {len(df)} total)")
             print(f"{'='*60}")
@@ -758,7 +767,11 @@ def main(
         print(f"{'='*60}")
         
         df_final = pd.read_excel(input_excel_file)
-        remaining_df = df_final[df_final['processed'].str.strip().str.lower() != 'done'].copy()
+        if 'processed' not in df_final.columns:
+            df_final['processed'] = ''
+            df_final.to_excel(input_excel_file, index=False)
+
+        remaining_df = df_final[_pending_mask(df_final)].copy()
         
         if len(remaining_df) > 0:
             print(f"Found {len(remaining_df)} remaining vehicles to process.")
@@ -784,6 +797,8 @@ def main(
         
         # Final save of input file
         final_df = pd.read_excel(input_excel_file)
+        if 'processed' not in final_df.columns:
+            final_df['processed'] = ''
         final_df.to_excel(input_excel_file, index=False)
         
         print(f"\n{'='*60}")
