@@ -71,6 +71,9 @@ VEHICLE_COLUMN_NAMES = [
     'Licence Plate No.'
 ]
 
+# How many leading rows to scan when the header is not on row 1
+HEADER_SCAN_ROWS = 10
+
 # Parallel DB prefetch (checkpostmaster; default flow also uses capacity_vehicle_numbers).
 # Each worker uses its own DB connection; web scraping stays single-threaded in scrape modules.
 DB_PREFETCH_WORKERS = 8
@@ -80,10 +83,168 @@ DB_PREFETCH_WORKERS = 8
 selenium_processing = SELENIUM_PROCESSING
 
 
+def _cell_as_header_text(value):
+    """Normalize a cell value for header-keyword comparison."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() == "nan":
+        return ""
+    # Collapse whitespace / newlines often seen in Excel header cells
+    return " ".join(text.split())
+
+
+def _cell_matches_vehicle_header(cell_text):
+    """
+    True if a cell looks like a vehicle-registration header keyword.
+
+    Checks VEHICLE_COLUMN_NAMES (exact then partial), then veh+reg / vehicle+no.
+    """
+    if not cell_text:
+        return False
+    lowered = cell_text.lower().strip().rstrip(".")
+
+    for name in VEHICLE_COLUMN_NAMES:
+        expected = name.lower().strip().rstrip(".")
+        if lowered == expected:
+            return True
+
+    for name in VEHICLE_COLUMN_NAMES:
+        expected = name.lower().strip().rstrip(".")
+        if expected in lowered or lowered in expected:
+            return True
+
+    if "veh" in lowered and "reg" in lowered:
+        return True
+    if "vehicle" in lowered and ("no" in lowered or "number" in lowered):
+        return True
+    if "licence plate" in lowered or "license plate" in lowered:
+        return True
+    return False
+
+
+def _find_header_row_index(raw_df, max_rows=HEADER_SCAN_ROWS):
+    """
+    Scan the first max_rows of a header-less DataFrame for vehicle header keywords.
+
+    Returns 0-based row index of the header, or None if not found.
+    """
+    if raw_df is None or raw_df.empty:
+        return None
+
+    scan_limit = min(int(max_rows), len(raw_df))
+    for row_idx in range(scan_limit):
+        row = raw_df.iloc[row_idx]
+        for value in row.tolist():
+            if _cell_matches_vehicle_header(_cell_as_header_text(value)):
+                return row_idx
+    return None
+
+
+def _dataframe_from_header_row(raw_df, header_row_idx):
+    """Promote header_row_idx to column names; keep only rows below it."""
+    header_values = [
+        _cell_as_header_text(v) or f"Unnamed_{i}"
+        for i, v in enumerate(raw_df.iloc[header_row_idx].tolist())
+    ]
+
+    # Ensure unique column names
+    seen = {}
+    columns = []
+    for name in header_values:
+        key = name
+        if key in seen:
+            seen[key] += 1
+            key = f"{name}_{seen[name]}"
+        else:
+            seen[key] = 0
+        columns.append(key)
+
+    data_df = raw_df.iloc[header_row_idx + 1 :].copy()
+    data_df.columns = columns
+    data_df = data_df.reset_index(drop=True)
+
+    # Drop fully empty rows
+    data_df = data_df.dropna(how="all")
+    return data_df
+
+
+def _find_vehicle_column_in_df(df):
+    """Find vehicle number column from VEHICLE_COLUMN_NAMES / fallbacks."""
+    veh_col = None
+    df_columns_lower = {str(col).lower(): col for col in df.columns}
+
+    for col_name in VEHICLE_COLUMN_NAMES:
+        if col_name.lower() in df_columns_lower:
+            veh_col = df_columns_lower[col_name.lower()]
+            print(f"  [OK] Found vehicle column (exact match): '{veh_col}'")
+            return veh_col
+
+    for col_name in VEHICLE_COLUMN_NAMES:
+        for df_col in df.columns:
+            df_col_l = str(df_col).lower()
+            name_l = col_name.lower()
+            if name_l in df_col_l or df_col_l in name_l:
+                print(f"  [OK] Found vehicle column (partial match): '{df_col}'")
+                return df_col
+
+    for col in df.columns:
+        col_l = str(col).lower()
+        if "veh" in col_l and "reg" in col_l:
+            print(f"  [OK] Found vehicle column (veh+reg): '{col}'")
+            return col
+
+    for col in df.columns:
+        col_l = str(col).lower()
+        if "vehicle" in col_l and ("no" in col_l or "number" in col_l):
+            print(f"  [OK] Found vehicle column (fallback search): '{col}'")
+            return col
+
+    return None
+
+
+def load_input_dataframe(file_buffer, is_csv=False, header_scan_rows=HEADER_SCAN_ROWS):
+    """
+    Load CSV/Excel and detect header within the first header_scan_rows rows.
+
+    Many uploads put titles/metadata above the real header. This reads without
+    assuming row 0 is the header, finds a vehicle-keyword row, then uses rows below.
+    """
+    file_buffer.seek(0)
+    if is_csv:
+        raw_df = pd.read_csv(file_buffer, header=None, dtype=str)
+    else:
+        raw_df = pd.read_excel(file_buffer, engine="openpyxl", header=None, dtype=str)
+
+    print(f"  [INFO] Raw file loaded: {len(raw_df)} rows (scanning first {header_scan_rows} for header)")
+
+    header_row_idx = _find_header_row_index(raw_df, max_rows=header_scan_rows)
+    if header_row_idx is None:
+        print(
+            f"  [ERROR] No vehicle header keyword found in the first {header_scan_rows} rows"
+        )
+        preview = raw_df.head(header_scan_rows)
+        print(f"  [INFO] First rows preview:\n{preview}")
+        return None
+
+    if header_row_idx == 0:
+        print("  [OK] Header found on row 1")
+    else:
+        print(
+            f"  [OK] Header found on row {header_row_idx + 1} "
+            f"(skipped {header_row_idx} leading row(s))"
+        )
+
+    df = _dataframe_from_header_row(raw_df, header_row_idx)
+    print(f"  [OK] Data rows below header: {len(df)}")
+    print(f"  [INFO] Columns: {list(df.columns)}")
+    return df
+
+
 def _find_veh_reg_column(df):
     """Match scrape_vehicle_weights column rule: column name contains both 'veh' and 'reg'."""
     for col in df.columns:
-        if "veh" in col.lower() and "reg" in col.lower():
+        if "veh" in str(col).lower() and "reg" in str(col).lower():
             return col
     return None
 
@@ -507,51 +668,17 @@ def process_excel_file(input_url, record_id):
         is_csv = input_url_lc.endswith(".csv")
 
         # Step 2: Read input and extract vehicle numbers
+        # Header may not be on row 1 — scan first HEADER_SCAN_ROWS for keywords
         print("\n[STEP 2] Reading input file and extracting vehicle numbers...")
         try:
-            if is_csv:
-                # CSV -> DataFrame
-                file_buffer.seek(0)
-                df = pd.read_csv(file_buffer)
-                print(f"  [OK] CSV file loaded: {len(df)} rows")
-            else:
-                # Default: treat as Excel
-                df = pd.read_excel(file_buffer, engine='openpyxl')
-                print(f"  [OK] Excel file loaded: {len(df)} rows")
+            df = load_input_dataframe(file_buffer, is_csv=is_csv)
+            if df is None or df.empty:
+                return False
         except Exception as e:
             print(f"  [ERROR] Failed to read input file: {e}")
             return False
-        
-        # Find vehicle number column from the predefined list
-        veh_col = None
-        df_columns_lower = {col.lower(): col for col in df.columns}  # Create case-insensitive mapping
-        
-        # First, try exact match (case-insensitive)
-        for col_name in VEHICLE_COLUMN_NAMES:
-            if col_name.lower() in df_columns_lower:
-                veh_col = df_columns_lower[col_name.lower()]
-                print(f"  [OK] Found vehicle column (exact match): '{veh_col}'")
-                break
-        
-        # If no exact match, try partial match (contains vehicle column name)
-        if veh_col is None:
-            for col_name in VEHICLE_COLUMN_NAMES:
-                for df_col in df.columns:
-                    if col_name.lower() in df_col.lower() or df_col.lower() in col_name.lower():
-                        veh_col = df_col
-                        print(f"  [OK] Found vehicle column (partial match): '{veh_col}'")
-                        break
-                if veh_col:
-                    break
-        
-        # Fallback: search for columns with 'vehicle' and 'no' in name
-        if veh_col is None:
-            for col in df.columns:
-                if 'vehicle' in col.lower() and 'no' in col.lower():
-                    veh_col = col
-                    print(f"  [OK] Found vehicle column (fallback search): '{veh_col}'")
-                    break
-        
+
+        veh_col = _find_vehicle_column_in_df(df)
         if veh_col is None:
             print("  [ERROR] Could not find vehicle number column")
             print(f"  [INFO] Available columns: {list(df.columns)}")
