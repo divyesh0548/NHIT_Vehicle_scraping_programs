@@ -14,10 +14,10 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 # Configure these variables before running
 # ---------------------------------------------------------------------------
-INPUT_FILE = "ihmcl_nathavalasa_20260807_063333_input.xlsx"              # File to clean (rows may be removed)
-OUTPUT_FILE = "ihmcl_nathavalasa_20260807_063333_ouput.xlsx"            # Lookup file (values already processed)
+INPUT_FILE = "Checkpost_Mokha_20260807_055059.csv"              # File to clean (rows may be removed)
+OUTPUT_FILE = "Checkpost_Mokha_20260807_055059_cleaned.xlsx"            # Lookup file (values already processed)
 INPUT_COLUMN_NAME = "Veh Reg No."      # Column in INPUT_FILE
-OUTPUT_COLUMN_NAME = "Vehicle Number"     # Column in OUTPUT_FILE
+OUTPUT_COLUMN_NAME = "Veh Reg No."     # Column in OUTPUT_FILE
 RESULT_FILE = ""                       # Optional; blank = overwrite INPUT_FILE
 # ---------------------------------------------------------------------------
 

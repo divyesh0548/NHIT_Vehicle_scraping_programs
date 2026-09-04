@@ -33,7 +33,7 @@ from config import (
 # ---------------------------------------------------------------------------
 # Configure these variables before running
 # ---------------------------------------------------------------------------
-RECORD_ID = 404        # nhit_vehicles.id to delete
+RECORD_ID = 415       # nhit_vehicles.id to delete
 # True  -> print what would be deleted; no S3/DB changes
 # False -> delete S3 objects and the DB row
 DRY_RUN = False

@@ -41,9 +41,9 @@ from config import (
 # ---------------------------------------------------------------------------
 # Configure these variables before running
 # ---------------------------------------------------------------------------
-RECORD_ID = 384                    # nhit_vehicles.id to update
-EXCEL_FILE_1 = "ihmcl_nathavalasa_1.xlsx"       # First Excel to merge
-EXCEL_FILE_2 = "ihmcl_nathavalasa_2.xlsx"       # Second Excel to merge
+RECORD_ID = 383                    # nhit_vehicles.id to update
+EXCEL_FILE_1 = "Checkpost_Mokha_20260807_055059_rerun_id_383_20260811_092609.xlsx"       # First Excel to merge
+EXCEL_FILE_2 = "Checkpost_Mokha_20260807_055059_cleaned.xlsx"       # Second Excel to merge
 # Optional local copy of merged file; blank = do not save locally
 LOCAL_MERGED_FILE = ""
 # True  -> merge only; print URLs that would be replaced / written (no S3/DB changes)
