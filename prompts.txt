@@ -1,1 +1,7 @@
-I want you to develop a python program which will merge two excel files (which will have same column names) and upload it to S3 cloud. Take id as input for the table nhit_vehicles. For that id, remove the file stored in "output_file_s3_url" from table as well as S3 cloud. And upload merged output and save it's URL in that column. For S3 key take the same file path as saved in that ouput column and upload the file.
+@web_scrap_reg_date_fuel_type.py I want to develop a web scraping program Just like @web_scrap_for_lookup_chhattisgarh.py this, but state and data will be different.
+
+Select the state "Kerala". Select option after selecting state "VEHICLE TAX COLLECTION (OTHER STATE)".
+
+I want "Registration Date" and "Fuel" details for each vehicle. Refer this page, which will show details @reference.html .
+
+Develop the program with a selenium hub support and also normal web scraping. provide a bool for that. @.env:15-22 Jusr like this.
