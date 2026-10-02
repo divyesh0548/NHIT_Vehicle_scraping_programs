@@ -14,12 +14,14 @@ Selenium mode:
     False -> single local Chrome browser.
 
 Progress:
-    Each grid worker writes its own chunk_XX.xlsx. Progress is saved after every
-    vehicle and merged into merged_output.xlsx at the end.
+    Single-workbook mode keeps the old per-node chunk_XX.xlsx progress files by
+    default. Folder mode keeps a JSON status file and updates each source
+    workbook directly after it completes.
 """
 
+import argparse
+import json
 import os
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -64,6 +66,8 @@ USE_SELENIUM_GRID = SELENIUM_PROCESSING
 REGISTRATION_DATE_COLUMN = "Registration Date"
 FUEL_COLUMN = "Fuel"
 DETAIL_COLUMNS = [REGISTRATION_DATE_COLUMN, FUEL_COLUMN]
+SUPPORTED_WORKBOOK_EXTENSIONS = {".xlsx"}
+DEFAULT_STATUS_FILENAME = "reg_date_fuel_status.json"
 
 # Column used in per-node progress Excel files so merge can restore row positions.
 ORIG_INDEX_COLUMN = "_orig_index"
@@ -752,7 +756,12 @@ def _scrape_chunk(chunk_df, remote_url, chunk_id=None, progress_path=None):
         kerala_portal._thread_remote_url.value = None
 
 
-def _run_grid_scrape(df_input, remote_url, progress_dir=None):
+def _run_grid_scrape(
+    df_input,
+    remote_url,
+    progress_dir=None,
+    write_progress_files=True,
+):
     """
     Split work across Selenium Grid nodes and merge per-node progress files.
     """
@@ -760,14 +769,14 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
     if not chunks:
         return df_input
 
-    if progress_dir is None:
+    if write_progress_files and progress_dir is None:
         progress_dir = make_progress_dir()
-    else:
+    elif write_progress_files:
         Path(progress_dir).mkdir(parents=True, exist_ok=True)
 
     print(
         f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url} "
-        f"| progress_dir={progress_dir}",
+        f"| progress_dir={progress_dir if write_progress_files else 'disabled'}",
         flush=True,
     )
 
@@ -787,8 +796,13 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
         with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
             future_to_chunk = {}
             for chunk_id, chunk in enumerate(chunks, start=1):
-                path = chunk_progress_path(progress_dir, chunk_id)
-                save_chunk_progress(chunk, path)
+                path = (
+                    chunk_progress_path(progress_dir, chunk_id)
+                    if write_progress_files
+                    else None
+                )
+                if path:
+                    save_chunk_progress(chunk, path)
                 future = executor.submit(
                     _scrape_chunk, chunk, remote_url, chunk_id, path
                 )
@@ -809,7 +823,11 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
                         flush=True,
                     )
 
-        merged = merge_chunk_progress_files(df_input, progress_dir)
+        merged = (
+            merge_chunk_progress_files(df_input, progress_dir)
+            if write_progress_files
+            else None
+        )
         if merged is None and result_frames:
             merged = df_input.copy()
             for col in DETAIL_COLUMNS:
@@ -833,7 +851,11 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
     except Exception as exc:
         grid_error = str(exc)
         print(f"  [SELENIUM GRID] error: {exc}", flush=True)
-        recovered = merge_chunk_progress_files(df_input, progress_dir)
+        recovered = (
+            merge_chunk_progress_files(df_input, progress_dir)
+            if write_progress_files
+            else None
+        )
         if recovered is not None:
             merged = recovered
     finally:
@@ -845,14 +867,21 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
             f"  [SELENIUM GRID] falling back to local Chrome... ({grid_error})",
             flush=True,
         )
-        local_path = chunk_progress_path(progress_dir, 99)
+        local_path = (
+            chunk_progress_path(progress_dir, 99)
+            if write_progress_files
+            else None
+        )
         return _scrape_chunk(df_input, None, chunk_id=99, progress_path=local_path)
 
     if grid_error and merged is not None:
-        print(
-            f"  [SELENIUM GRID] partial progress kept from {progress_dir}",
-            flush=True,
-        )
+        if write_progress_files:
+            print(
+                f"  [SELENIUM GRID] partial progress kept from {progress_dir}",
+                flush=True,
+            )
+        else:
+            print("  [SELENIUM GRID] partial in-memory progress kept", flush=True)
 
     return merged if merged is not None else df_input
 
@@ -862,6 +891,7 @@ def scrape_kerala_reg_date_fuel(
     remote_url=None,
     use_selenium_grid=None,
     progress_dir=None,
+    write_progress_files=True,
 ):
     """
     Scrape Registration Date and Fuel for all eligible vehicles in df_input.
@@ -874,6 +904,9 @@ def scrape_kerala_reg_date_fuel(
         Explicit Grid URL. When set, it forces grid usage.
     progress_dir:
         Folder for per-node chunk_XX.xlsx progress files.
+    write_progress_files:
+        True keeps the old chunk_XX.xlsx progress files. False keeps progress
+        in memory for callers that update each source workbook directly.
     """
     if use_selenium_grid is None:
         use_selenium_grid = USE_SELENIUM_GRID
@@ -889,22 +922,33 @@ def scrape_kerala_reg_date_fuel(
 
     if not use_grid:
         print("Web scrape mode: local Chrome (single browser)")
-        if progress_dir is None:
+        if write_progress_files and progress_dir is None:
             progress_dir = make_progress_dir()
-        local_path = chunk_progress_path(progress_dir, 1)
+        local_path = (
+            chunk_progress_path(progress_dir, 1)
+            if write_progress_files
+            else None
+        )
         return _scrape_chunk(df_input, None, chunk_id=1, progress_path=local_path)
 
-    if progress_dir is None:
+    if write_progress_files and progress_dir is None:
         progress_dir = make_progress_dir()
-    else:
+    elif write_progress_files:
         Path(progress_dir).mkdir(parents=True, exist_ok=True)
         print(f"[PROGRESS] Writing outputs to: {progress_dir}")
+    else:
+        print("[PROGRESS] Per-node progress Excel files disabled")
 
     print(
         f"Web scrape mode: Selenium Grid "
         f"({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})"
     )
-    return _run_grid_scrape(df_input, grid_url, progress_dir=progress_dir)
+    return _run_grid_scrape(
+        df_input,
+        grid_url,
+        progress_dir=progress_dir,
+        write_progress_files=write_progress_files,
+    )
 
 
 # Friendly aliases for imports from other scripts.
@@ -912,27 +956,83 @@ scrape_registration_date_and_fuel = scrape_kerala_reg_date_fuel
 scrape_reg_date_fuel_type = scrape_kerala_reg_date_fuel
 
 
-if __name__ == "__main__":
-    EXCEL_PATH = r"C:\Divyesh\S_T_Vehicle_processing\Kerala_test.xlsx"
+def _status_timestamp():
+    return datetime.now().isoformat(timespec="seconds")
 
-    # Usage:
-    #   python web_scrap_reg_date_fuel_type.py input.xlsx
-    #
-    # Put your workbook path in EXCEL_PATH above. A CLI path or
-    # REG_DATE_FUEL_EXCEL_PATH can still override it.
-    excel_path = (
-        sys.argv[1]
-        if len(sys.argv) > 1
-        else os.getenv("REG_DATE_FUEL_EXCEL_PATH", EXCEL_PATH)
+
+def load_folder_status(status_path):
+    """Load or initialize the folder-level JSON status file."""
+    status_path = Path(status_path)
+    if not status_path.exists():
+        return {
+            "version": 1,
+            "updated_at": _status_timestamp(),
+            "files": {},
+        }
+
+    with status_path.open("r", encoding="utf-8") as fh:
+        status = json.load(fh)
+
+    if not isinstance(status, dict):
+        raise ValueError(f"Invalid status JSON shape in {status_path}")
+    status.setdefault("version", 1)
+    status.setdefault("updated_at", _status_timestamp())
+    status.setdefault("files", {})
+    if not isinstance(status["files"], dict):
+        raise ValueError(f"Invalid 'files' object in {status_path}")
+    return status
+
+
+def save_folder_status(status_path, status):
+    """Atomically save the folder-level JSON status file."""
+    status_path = Path(status_path)
+    status_path.parent.mkdir(parents=True, exist_ok=True)
+    status["updated_at"] = _status_timestamp()
+
+    tmp_path = status_path.with_name(status_path.name + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as fh:
+        json.dump(status, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    tmp_path.replace(status_path)
+
+
+def discover_workbooks(folder_path, recursive=False):
+    """Find supported workbook files in a folder."""
+    folder_path = Path(folder_path)
+    iterator = folder_path.rglob("*") if recursive else folder_path.iterdir()
+    workbooks = []
+    for path in iterator:
+        if not path.is_file():
+            continue
+        if path.name.startswith("~$"):
+            continue
+        if path.suffix.lower() in SUPPORTED_WORKBOOK_EXTENSIONS:
+            workbooks.append(path)
+    return sorted(workbooks, key=lambda p: str(p).lower())
+
+
+def workbook_status_key(folder_path, workbook_path):
+    """Use a stable relative path key inside the status JSON."""
+    return (
+        Path(workbook_path)
+        .resolve()
+        .relative_to(Path(folder_path).resolve())
+        .as_posix()
     )
 
-    if not Path(excel_path).exists():
-        raise FileNotFoundError(
-            f"Excel file not found: {excel_path}. Pass a file path as the first argument "
-            "or set REG_DATE_FUEL_EXCEL_PATH."
-        )
 
-    progress_dir = make_progress_dir(excel_path)
+def process_workbook_in_place(excel_path, write_progress_files=True):
+    """Scrape all eligible sheets in a workbook and save back to the same file."""
+    excel_path = Path(excel_path)
+    if excel_path.suffix.lower() not in SUPPORTED_WORKBOOK_EXTENSIONS:
+        raise ValueError(
+            f"Unsupported workbook type '{excel_path.suffix}'. "
+            f"Supported: {', '.join(sorted(SUPPORTED_WORKBOOK_EXTENSIONS))}"
+        )
+    if not excel_path.exists():
+        raise FileNotFoundError(f"Excel file not found: {excel_path}")
+
+    progress_dir = make_progress_dir(excel_path) if write_progress_files else None
 
     with pd.ExcelFile(excel_path) as xls:
         sheets_dict = {
@@ -940,7 +1040,9 @@ if __name__ == "__main__":
             for sheet in xls.sheet_names
         }
 
-    scraped_any = False
+    scraped_sheets = []
+    skipped_sheets = []
+
     for sheet_name, df_sheet in sheets_dict.items():
         veh_col = find_vehicle_reg_column(df_sheet)
         if veh_col is None:
@@ -948,6 +1050,7 @@ if __name__ == "__main__":
                 f"[SKIP] Sheet '{sheet_name}': no vehicle registration header keyword found "
                 f"(columns: {list(df_sheet.columns)})"
             )
+            skipped_sheets.append(sheet_name)
             continue
 
         print(
@@ -958,17 +1061,238 @@ if __name__ == "__main__":
             df_sheet,
             use_selenium_grid=USE_SELENIUM_GRID,
             progress_dir=progress_dir,
+            write_progress_files=write_progress_files,
         )
-        scraped_any = True
+        scraped_sheets.append(sheet_name)
 
-    if not scraped_any:
+    if not scraped_sheets:
         print(
             "[ERROR] No sheet contained a vehicle registration header keyword "
             "(looked for columns with 'veh'+'reg' or 'vehicle'). Nothing scraped."
         )
-    else:
-        with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-            for sheet, data in sheets_dict.items():
-                data.to_excel(writer, sheet_name=sheet, index=False)
-        print(f"[OK] Results saved back to '{excel_path}'")
+        return {
+            "saved": False,
+            "scraped_sheets": scraped_sheets,
+            "skipped_sheets": skipped_sheets,
+            "progress_dir": progress_dir,
+        }
+
+    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+        for sheet, data in sheets_dict.items():
+            data.to_excel(writer, sheet_name=sheet, index=False)
+
+    print(f"[OK] Results saved back to '{excel_path}'")
+    if progress_dir:
         print(f"[OK] Per-node progress files kept in: {progress_dir}")
+
+    return {
+        "saved": True,
+        "scraped_sheets": scraped_sheets,
+        "skipped_sheets": skipped_sheets,
+        "progress_dir": progress_dir,
+    }
+
+
+def _is_file_complete(file_entry):
+    return str(file_entry.get("status", "")).lower() in {"processed", "skipped"}
+
+
+def process_folder(folder_path, status_path=None, recursive=False, write_progress_files=False):
+    """
+    Process every supported workbook in a folder, using JSON status to resume.
+
+    Files with status 'processed' or 'skipped' are not run again. Files marked
+    'pending', 'processing', or 'failed' are retried on the next execution.
+    """
+    folder_path = Path(folder_path).resolve()
+    if not folder_path.is_dir():
+        raise NotADirectoryError(f"Folder not found: {folder_path}")
+
+    if status_path is None:
+        status_path = folder_path / DEFAULT_STATUS_FILENAME
+    else:
+        status_path = Path(status_path)
+        if not status_path.is_absolute():
+            status_path = folder_path / status_path
+
+    workbooks = discover_workbooks(folder_path, recursive=recursive)
+    status = load_folder_status(status_path)
+    status["folder"] = str(folder_path)
+
+    for workbook in workbooks:
+        key = workbook_status_key(folder_path, workbook)
+        status["files"].setdefault(
+            key,
+            {
+                "status": "pending",
+                "path": key,
+                "created_at": _status_timestamp(),
+            },
+        )
+
+    save_folder_status(status_path, status)
+
+    print("=" * 80)
+    print("FOLDER PROCESSING")
+    print("=" * 80)
+    print(f"Folder: {folder_path}")
+    print(f"Status JSON: {status_path}")
+    print(f"Supported files found: {len(workbooks)}")
+    print("=" * 80)
+
+    processed = 0
+    skipped = 0
+    failed = 0
+
+    for workbook in workbooks:
+        key = workbook_status_key(folder_path, workbook)
+        file_entry = status["files"].setdefault(key, {"path": key})
+
+        if _is_file_complete(file_entry):
+            skipped += 1
+            print(f"[SKIP] Already complete: {key}")
+            continue
+
+        print("\n" + "=" * 80)
+        print(f"[FILE] Processing: {key}")
+        print("=" * 80)
+
+        file_entry.update(
+            {
+                "status": "processing",
+                "path": key,
+                "started_at": _status_timestamp(),
+                "updated_at": _status_timestamp(),
+                "error": "",
+            }
+        )
+        save_folder_status(status_path, status)
+
+        try:
+            result = process_workbook_in_place(
+                workbook,
+                write_progress_files=write_progress_files,
+            )
+            file_entry.update(
+                {
+                    "status": "processed" if result["saved"] else "skipped",
+                    "completed_at": _status_timestamp(),
+                    "updated_at": _status_timestamp(),
+                    "saved": result["saved"],
+                    "scraped_sheets": result["scraped_sheets"],
+                    "skipped_sheets": result["skipped_sheets"],
+                    "progress_dir": result["progress_dir"],
+                    "error": (
+                        ""
+                        if result["saved"]
+                        else "No vehicle registration sheet found"
+                    ),
+                }
+            )
+            if result["saved"]:
+                processed += 1
+            else:
+                skipped += 1
+            save_folder_status(status_path, status)
+        except Exception as exc:
+            failed += 1
+            file_entry.update(
+                {
+                    "status": "failed",
+                    "completed_at": _status_timestamp(),
+                    "updated_at": _status_timestamp(),
+                    "error": str(exc),
+                }
+            )
+            save_folder_status(status_path, status)
+            print(f"[ERROR] Failed processing {key}: {exc}")
+
+    print("\n" + "=" * 80)
+    print("FOLDER PROCESSING COMPLETE")
+    print("=" * 80)
+    print(f"Processed now: {processed}")
+    print(f"Skipped/already complete: {skipped}")
+    print(f"Failed: {failed}")
+    print(f"Status JSON: {status_path}")
+    print("=" * 80)
+
+    return {
+        "processed": processed,
+        "skipped": skipped,
+        "failed": failed,
+        "status_path": str(status_path),
+    }
+
+
+def parse_args(argv=None):
+    default_excel_path = r"C:\Divyesh\S_T_Vehicle_processing\Kerala_test.xlsx"
+    parser = argparse.ArgumentParser(
+        description=(
+            "Scrape Kerala Registration Date and Fuel into Excel files. "
+            "Pass a workbook path or a folder path."
+        )
+    )
+    parser.add_argument(
+        "path",
+        nargs="?",
+        default=os.getenv("REG_DATE_FUEL_EXCEL_PATH", default_excel_path),
+        help="Input .xlsx file or folder containing .xlsx files.",
+    )
+    parser.add_argument(
+        "--status-file",
+        default=os.getenv("REG_DATE_FUEL_STATUS_FILE", DEFAULT_STATUS_FILENAME),
+        help=(
+            "Folder-mode JSON status file name/path. Relative paths are placed "
+            "inside the input folder."
+        ),
+    )
+    parser.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Folder mode only: scan subfolders too.",
+    )
+    parser.add_argument(
+        "--progress-files",
+        choices=("auto", "yes", "no"),
+        default="auto",
+        help=(
+            "Keep old per-node progress Excel files. auto keeps them for a "
+            "single workbook and disables them for folder mode."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    input_path = Path(args.path)
+
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"Input path not found: {input_path}. Pass a workbook/folder path "
+            "or set REG_DATE_FUEL_EXCEL_PATH."
+        )
+
+    if args.progress_files == "yes":
+        write_progress_files = True
+    elif args.progress_files == "no":
+        write_progress_files = False
+    else:
+        write_progress_files = input_path.is_file()
+
+    if input_path.is_dir():
+        process_folder(
+            input_path,
+            status_path=args.status_file,
+            recursive=args.recursive,
+            write_progress_files=write_progress_files,
+        )
+    else:
+        process_workbook_in_place(
+            input_path,
+            write_progress_files=write_progress_files,
+        )
+
+
+if __name__ == "__main__":
+    main()
