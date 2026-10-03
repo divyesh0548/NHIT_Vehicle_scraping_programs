@@ -15,3 +15,5 @@ _ihmcl_tmp_output.xlsx
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+*.json
