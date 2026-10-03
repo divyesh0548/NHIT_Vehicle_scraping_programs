@@ -14,9 +14,11 @@ Selenium mode:
     False -> single local Chrome browser.
 
 Progress:
-    Single-workbook mode keeps the old per-node chunk_XX.xlsx progress files by
-    default. Folder mode keeps a JSON status file and updates each source
-    workbook directly after it completes.
+    Live-save mode updates the source workbook as each vehicle finishes, so a
+    stopped run can resume from already-filled Registration Date / Fuel cells.
+    Single-workbook mode can also keep the old per-node chunk_XX.xlsx progress
+    files. Folder mode keeps a JSON status file in addition to live workbook
+    updates.
 """
 
 import argparse
@@ -26,8 +28,33 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
+
+# =============================================================================
+# USER INPUTS - edit these variables and run the script directly.
+# =============================================================================
+# Can be a single .xlsx workbook or a folder containing .xlsx workbooks.
+INPUT_PATH = r"C:\Divyesh\S_T_Vehicle_processing\Usaka"
+
+# Folder mode only. Relative names are created inside INPUT_PATH.
+STATUS_FILE = "reg_date_fuel_status.json"
+
+# Folder mode only. True scans subfolders too.
+RECURSIVE = False
+
+# Keep old per-node chunk progress files: "auto", "yes", or "no".
+# auto = yes for a single workbook, no for folder mode.
+PROGRESS_FILES = "auto"
+
+# Update the source workbook while Selenium runs so stopping mid-process can resume.
+LIVE_SAVE = True
+
+# Save source workbook after this many processed rows. 1 is safest.
+LIVE_SAVE_EVERY = max(1, int(os.getenv("REG_DATE_FUEL_LIVE_SAVE_EVERY", "1") or "1"))
+# =============================================================================
 
 import pandas as pd
+from openpyxl import load_workbook
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -67,7 +94,8 @@ REGISTRATION_DATE_COLUMN = "Registration Date"
 FUEL_COLUMN = "Fuel"
 DETAIL_COLUMNS = [REGISTRATION_DATE_COLUMN, FUEL_COLUMN]
 SUPPORTED_WORKBOOK_EXTENSIONS = {".xlsx"}
-DEFAULT_STATUS_FILENAME = "reg_date_fuel_status.json"
+DEFAULT_STATUS_FILENAME = STATUS_FILE
+DEFAULT_LIVE_SAVE_EVERY = LIVE_SAVE_EVERY
 
 # Column used in per-node progress Excel files so merge can restore row positions.
 ORIG_INDEX_COLUMN = "_orig_index"
@@ -98,6 +126,26 @@ def _is_real_detail(value):
     if lowered.startswith("---select"):
         return False
     return lowered not in {str(v).strip().lower() for v in EMPTY_DETAIL_VALUES}
+
+
+def _is_completed_detail_value(value):
+    """Return True when an output cell indicates this field was already attempted."""
+    if pd.isna(value):
+        return False
+    text = str(value).strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if lowered.startswith("error"):
+        return False
+    return True
+
+
+def _row_has_completed_details(row):
+    return all(
+        col in row and _is_completed_detail_value(row.get(col, ""))
+        for col in DETAIL_COLUMNS
+    )
 
 
 def _set_details(df, idx, details):
@@ -525,6 +573,74 @@ def chunk_progress_path(progress_dir, chunk_id):
     return str(Path(progress_dir) / f"chunk_{int(chunk_id):02d}.xlsx")
 
 
+class ExcelLiveUpdater:
+    """Thread-safe, atomic row updater for the source workbook."""
+
+    def __init__(self, excel_path, sheet_name, detail_columns=None, save_every=1):
+        self.excel_path = Path(excel_path)
+        self.sheet_name = sheet_name
+        self.detail_columns = list(detail_columns or DETAIL_COLUMNS)
+        self.save_every = max(1, int(save_every or 1))
+        self.lock = Lock()
+        self.pending_saves = 0
+        self.workbook = load_workbook(self.excel_path)
+        if sheet_name not in self.workbook.sheetnames:
+            raise ValueError(f"Sheet not found in workbook: {sheet_name}")
+        self.sheet = self.workbook[sheet_name]
+        self.column_indexes = self._ensure_detail_headers()
+        self._save_locked(reason="headers")
+        print(
+            f"[LIVE SAVE] Updating source workbook after every "
+            f"{self.save_every} processed row(s): {self.excel_path} [{sheet_name}]",
+            flush=True,
+        )
+
+    def _ensure_detail_headers(self):
+        headers = {}
+        for cell in self.sheet[1]:
+            value = str(cell.value or "").strip()
+            if value:
+                headers[value] = cell.column
+
+        next_col = self.sheet.max_column + 1
+        indexes = {}
+        for column_name in self.detail_columns:
+            if column_name not in headers:
+                self.sheet.cell(row=1, column=next_col).value = column_name
+                headers[column_name] = next_col
+                next_col += 1
+            indexes[column_name] = headers[column_name]
+        return indexes
+
+    def _save_locked(self, reason="progress"):
+        tmp_path = self.excel_path.with_name(
+            f".{self.excel_path.stem}.live_save.tmp{self.excel_path.suffix}"
+        )
+        self.workbook.save(tmp_path)
+        tmp_path.replace(self.excel_path)
+        self.pending_saves = 0
+        print(f"[LIVE SAVE] Saved {reason}: {self.excel_path}", flush=True)
+
+    def update_row(self, row_index, details):
+        with self.lock:
+            excel_row = int(row_index) + 2
+            for column_name in self.detail_columns:
+                if column_name not in self.column_indexes:
+                    continue
+                self.sheet.cell(
+                    row=excel_row,
+                    column=self.column_indexes[column_name],
+                ).value = details.get(column_name, "")
+            self.pending_saves += 1
+            if self.pending_saves >= self.save_every:
+                self._save_locked(reason=f"row {excel_row}")
+
+    def flush(self):
+        with self.lock:
+            if self.pending_saves:
+                self._save_locked(reason="final flush")
+
+
 def save_chunk_progress(df, progress_path):
     """Persist current chunk DataFrame to its own Excel file."""
     if not progress_path:
@@ -618,7 +734,11 @@ def find_vehicle_reg_column(df):
     return None
 
 
-def _scrape_kerala_reg_date_fuel_impl(df_input, progress_path=None):
+def _scrape_kerala_reg_date_fuel_impl(
+    df_input,
+    progress_path=None,
+    progress_callback=None,
+):
     df = df_input.copy()
 
     veh_col = find_vehicle_reg_column(df)
@@ -646,7 +766,14 @@ def _scrape_kerala_reg_date_fuel_impl(df_input, progress_path=None):
         return df
 
     valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
-    remaining_df = df[valid_mask]
+    completed_mask = df.apply(_row_has_completed_details, axis=1)
+    completed_count = int((valid_mask & completed_mask).sum())
+    if completed_count:
+        print(
+            f"[RESUME] Skipping {completed_count} vehicle(s) already filled in "
+            f"{REGISTRATION_DATE_COLUMN}/{FUEL_COLUMN}"
+        )
+    remaining_df = df[valid_mask & ~completed_mask]
     remaining_count = len(remaining_df)
 
     print("\n" + "=" * 80)
@@ -710,6 +837,8 @@ def _scrape_kerala_reg_date_fuel_impl(df_input, progress_path=None):
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)
 
         save_chunk_progress(df, progress_path)
+        if progress_callback:
+            progress_callback(idx, {col: df.at[idx, col] for col in DETAIL_COLUMNS})
 
         if success:
             scraped_count += 1
@@ -742,7 +871,13 @@ def _scrape_kerala_reg_date_fuel_impl(df_input, progress_path=None):
     return df
 
 
-def _scrape_chunk(chunk_df, remote_url, chunk_id=None, progress_path=None):
+def _scrape_chunk(
+    chunk_df,
+    remote_url,
+    chunk_id=None,
+    progress_path=None,
+    progress_callback=None,
+):
     """Run scraping for one chunk with a per-thread remote URL."""
     kerala_portal._thread_remote_url.value = remote_url
     try:
@@ -751,7 +886,11 @@ def _scrape_chunk(chunk_df, remote_url, chunk_id=None, progress_path=None):
                 f"[PROGRESS] Node/chunk {chunk_id} output file: {progress_path}",
                 flush=True,
             )
-        return _scrape_kerala_reg_date_fuel_impl(chunk_df, progress_path=progress_path)
+        return _scrape_kerala_reg_date_fuel_impl(
+            chunk_df,
+            progress_path=progress_path,
+            progress_callback=progress_callback,
+        )
     finally:
         kerala_portal._thread_remote_url.value = None
 
@@ -761,6 +900,7 @@ def _run_grid_scrape(
     remote_url,
     progress_dir=None,
     write_progress_files=True,
+    progress_callback=None,
 ):
     """
     Split work across Selenium Grid nodes and merge per-node progress files.
@@ -804,7 +944,12 @@ def _run_grid_scrape(
                 if path:
                     save_chunk_progress(chunk, path)
                 future = executor.submit(
-                    _scrape_chunk, chunk, remote_url, chunk_id, path
+                    _scrape_chunk,
+                    chunk,
+                    remote_url,
+                    chunk_id,
+                    path,
+                    progress_callback,
                 )
                 future_to_chunk[future] = chunk_id
 
@@ -872,7 +1017,13 @@ def _run_grid_scrape(
             if write_progress_files
             else None
         )
-        return _scrape_chunk(df_input, None, chunk_id=99, progress_path=local_path)
+        return _scrape_chunk(
+            df_input,
+            None,
+            chunk_id=99,
+            progress_path=local_path,
+            progress_callback=progress_callback,
+        )
 
     if grid_error and merged is not None:
         if write_progress_files:
@@ -892,6 +1043,7 @@ def scrape_kerala_reg_date_fuel(
     use_selenium_grid=None,
     progress_dir=None,
     write_progress_files=True,
+    progress_callback=None,
 ):
     """
     Scrape Registration Date and Fuel for all eligible vehicles in df_input.
@@ -929,7 +1081,13 @@ def scrape_kerala_reg_date_fuel(
             if write_progress_files
             else None
         )
-        return _scrape_chunk(df_input, None, chunk_id=1, progress_path=local_path)
+        return _scrape_chunk(
+            df_input,
+            None,
+            chunk_id=1,
+            progress_path=local_path,
+            progress_callback=progress_callback,
+        )
 
     if write_progress_files and progress_dir is None:
         progress_dir = make_progress_dir()
@@ -948,6 +1106,7 @@ def scrape_kerala_reg_date_fuel(
         grid_url,
         progress_dir=progress_dir,
         write_progress_files=write_progress_files,
+        progress_callback=progress_callback,
     )
 
 
@@ -1021,7 +1180,24 @@ def workbook_status_key(folder_path, workbook_path):
     )
 
 
-def process_workbook_in_place(excel_path, write_progress_files=True):
+def save_workbook_frames_atomic(excel_path, sheets_dict):
+    """Save workbook data through a temp file before replacing the source."""
+    excel_path = Path(excel_path)
+    tmp_path = excel_path.with_name(
+        f".{excel_path.stem}.final_save.tmp{excel_path.suffix}"
+    )
+    with pd.ExcelWriter(tmp_path, engine="openpyxl") as writer:
+        for sheet, data in sheets_dict.items():
+            data.to_excel(writer, sheet_name=sheet, index=False)
+    tmp_path.replace(excel_path)
+
+
+def process_workbook_in_place(
+    excel_path,
+    write_progress_files=True,
+    live_save=True,
+    live_save_every=DEFAULT_LIVE_SAVE_EVERY,
+):
     """Scrape all eligible sheets in a workbook and save back to the same file."""
     excel_path = Path(excel_path)
     if excel_path.suffix.lower() not in SUPPORTED_WORKBOOK_EXTENSIONS:
@@ -1057,12 +1233,27 @@ def process_workbook_in_place(excel_path, write_progress_files=True):
             f"[OK] Sheet '{sheet_name}': found vehicle column '{veh_col}' "
             f"({len(df_sheet)} rows) - starting web scrape"
         )
-        sheets_dict[sheet_name] = scrape_kerala_reg_date_fuel(
-            df_sheet,
-            use_selenium_grid=USE_SELENIUM_GRID,
-            progress_dir=progress_dir,
-            write_progress_files=write_progress_files,
+        live_updater = (
+            ExcelLiveUpdater(
+                excel_path,
+                sheet_name,
+                detail_columns=DETAIL_COLUMNS,
+                save_every=live_save_every,
+            )
+            if live_save
+            else None
         )
+        try:
+            sheets_dict[sheet_name] = scrape_kerala_reg_date_fuel(
+                df_sheet,
+                use_selenium_grid=USE_SELENIUM_GRID,
+                progress_dir=progress_dir,
+                write_progress_files=write_progress_files,
+                progress_callback=live_updater.update_row if live_updater else None,
+            )
+        finally:
+            if live_updater:
+                live_updater.flush()
         scraped_sheets.append(sheet_name)
 
     if not scraped_sheets:
@@ -1077,9 +1268,7 @@ def process_workbook_in_place(excel_path, write_progress_files=True):
             "progress_dir": progress_dir,
         }
 
-    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        for sheet, data in sheets_dict.items():
-            data.to_excel(writer, sheet_name=sheet, index=False)
+    save_workbook_frames_atomic(excel_path, sheets_dict)
 
     print(f"[OK] Results saved back to '{excel_path}'")
     if progress_dir:
@@ -1097,7 +1286,14 @@ def _is_file_complete(file_entry):
     return str(file_entry.get("status", "")).lower() in {"processed", "skipped"}
 
 
-def process_folder(folder_path, status_path=None, recursive=False, write_progress_files=False):
+def process_folder(
+    folder_path,
+    status_path=None,
+    recursive=False,
+    write_progress_files=False,
+    live_save=True,
+    live_save_every=DEFAULT_LIVE_SAVE_EVERY,
+):
     """
     Process every supported workbook in a folder, using JSON status to resume.
 
@@ -1172,6 +1368,8 @@ def process_folder(folder_path, status_path=None, recursive=False, write_progres
             result = process_workbook_in_place(
                 workbook,
                 write_progress_files=write_progress_files,
+                live_save=live_save,
+                live_save_every=live_save_every,
             )
             file_entry.update(
                 {
@@ -1225,40 +1423,50 @@ def process_folder(folder_path, status_path=None, recursive=False, write_progres
 
 
 def parse_args(argv=None):
-    default_excel_path = r"C:\Divyesh\S_T_Vehicle_processing\Kerala_test.xlsx"
     parser = argparse.ArgumentParser(
         description=(
             "Scrape Kerala Registration Date and Fuel into Excel files. "
-            "Pass a workbook path or a folder path."
+            "Edit the USER INPUTS block near the top of this file for normal use. "
+            "Command-line args remain optional overrides."
         )
     )
     parser.add_argument(
         "path",
         nargs="?",
-        default=os.getenv("REG_DATE_FUEL_EXCEL_PATH", default_excel_path),
-        help="Input .xlsx file or folder containing .xlsx files.",
+        default=INPUT_PATH,
+        help="Optional override for INPUT_PATH (.xlsx file or folder).",
     )
     parser.add_argument(
         "--status-file",
-        default=os.getenv("REG_DATE_FUEL_STATUS_FILE", DEFAULT_STATUS_FILENAME),
+        default=STATUS_FILE,
         help=(
-            "Folder-mode JSON status file name/path. Relative paths are placed "
+            "Optional override for STATUS_FILE. Relative paths are placed "
             "inside the input folder."
         ),
     )
     parser.add_argument(
         "--recursive",
         action="store_true",
-        help="Folder mode only: scan subfolders too.",
+        default=RECURSIVE,
+        help="Optional override: folder mode only, scan subfolders too.",
     )
     parser.add_argument(
         "--progress-files",
         choices=("auto", "yes", "no"),
-        default="auto",
-        help=(
-            "Keep old per-node progress Excel files. auto keeps them for a "
-            "single workbook and disables them for folder mode."
-        ),
+        default=PROGRESS_FILES,
+        help="Optional override for PROGRESS_FILES: auto, yes, or no.",
+    )
+    parser.add_argument(
+        "--live-save",
+        choices=("yes", "no"),
+        default="yes" if LIVE_SAVE else "no",
+        help="Optional override for LIVE_SAVE: yes or no.",
+    )
+    parser.add_argument(
+        "--live-save-every",
+        type=int,
+        default=LIVE_SAVE_EVERY,
+        help="Optional override for LIVE_SAVE_EVERY.",
     )
     return parser.parse_args(argv)
 
@@ -1280,17 +1488,24 @@ def main(argv=None):
     else:
         write_progress_files = input_path.is_file()
 
+    live_save = args.live_save == "yes"
+    live_save_every = max(1, int(args.live_save_every or 1))
+
     if input_path.is_dir():
         process_folder(
             input_path,
             status_path=args.status_file,
             recursive=args.recursive,
             write_progress_files=write_progress_files,
+            live_save=live_save,
+            live_save_every=live_save_every,
         )
     else:
         process_workbook_in_place(
             input_path,
             write_progress_files=write_progress_files,
+            live_save=live_save,
+            live_save_every=live_save_every,
         )
 
 
