@@ -36,3 +36,7 @@ SELENIUM_NETWORK = os.getenv("SELENIUM_NETWORK", "selenium-grid")
 SELENIUM_HUB_CONTAINER = os.getenv("SELENIUM_HUB_CONTAINER", "selenium-hub")
 SELENIUM_NODE_IMAGE = os.getenv("SELENIUM_NODE_IMAGE", "selenium/node-chrome:latest")
 SELENIUM_NODE_STARTUP_TIMEOUT = int(os.getenv("SELENIUM_NODE_STARTUP_TIMEOUT", "90"))
+
+# Kerala Registration Date / Fuel scraper input
+# Single .xlsx workbook or a folder containing .xlsx workbooks
+REG_DATE_FUEL_EXCEL_PATH = (os.getenv("REG_DATE_FUEL_EXCEL_PATH") or "").strip()

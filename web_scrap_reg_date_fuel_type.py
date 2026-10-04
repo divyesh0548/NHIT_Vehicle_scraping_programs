@@ -32,10 +32,8 @@ from threading import Lock
 
 # =============================================================================
 # USER INPUTS - edit these variables and run the script directly.
+# INPUT_PATH comes from REG_DATE_FUEL_EXCEL_PATH in .env (via config).
 # =============================================================================
-# Can be a single .xlsx workbook or a folder containing .xlsx workbooks.
-INPUT_PATH = r"C:\Divyesh\S_T_Vehicle_processing\Usaka"
-
 # Folder mode only. Relative names are created inside INPUT_PATH.
 STATUS_FILE = "reg_date_fuel_status.json"
 
@@ -62,6 +60,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from config import (
     MAX_SELENIUM_GRID_NODES,
+    REG_DATE_FUEL_EXCEL_PATH,
     SELENIUM_AUTO_MANAGE_NODES,
     SELENIUM_PROCESSING,
     SELENIUM_REMOTE_URL,
@@ -78,6 +77,8 @@ from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_n
 # Reuse the already-tested Kerala Checkpost navigation/browser helpers.
 import web_scrape_kerala_checkpost as kerala_portal
 
+# Can be a single .xlsx workbook or a folder containing .xlsx workbooks.
+INPUT_PATH = REG_DATE_FUEL_EXCEL_PATH
 
 WAIT_TIME = kerala_portal.WAIT_TIME
 STATE_NAME = "KERALA"
@@ -1426,15 +1427,18 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description=(
             "Scrape Kerala Registration Date and Fuel into Excel files. "
-            "Edit the USER INPUTS block near the top of this file for normal use. "
+            "Set REG_DATE_FUEL_EXCEL_PATH in .env for normal use. "
             "Command-line args remain optional overrides."
         )
     )
     parser.add_argument(
         "path",
         nargs="?",
-        default=INPUT_PATH,
-        help="Optional override for INPUT_PATH (.xlsx file or folder).",
+        default=INPUT_PATH or None,
+        help=(
+            "Optional override for REG_DATE_FUEL_EXCEL_PATH "
+            "(.xlsx file or folder)."
+        ),
     )
     parser.add_argument(
         "--status-file",
@@ -1473,12 +1477,17 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    input_path = Path(args.path)
+    if not args.path:
+        raise FileNotFoundError(
+            "Input path not set. Set REG_DATE_FUEL_EXCEL_PATH in .env "
+            "or pass a workbook/folder path."
+        )
 
+    input_path = Path(args.path)
     if not input_path.exists():
         raise FileNotFoundError(
             f"Input path not found: {input_path}. Pass a workbook/folder path "
-            "or set REG_DATE_FUEL_EXCEL_PATH."
+            "or set REG_DATE_FUEL_EXCEL_PATH in .env."
         )
 
     if args.progress_files == "yes":
