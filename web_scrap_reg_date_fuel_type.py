@@ -11,6 +11,8 @@ Extracted fields from the Kerala tax collection page:
 Selenium mode:
     USE_SELENIUM_GRID defaults to config.SELENIUM_PROCESSING from .env.
     True  -> Selenium Grid / hub at SELENIUM_REMOTE_URL with parallel chunks.
+            Parallelism = MAX_SELENIUM_GRID_NODES x SE_NODE_MAX_SESSIONS
+            (e.g. 5 nodes x 5 sessions = 25 Chrome browsers).
     False -> single local Chrome browser.
 
 Progress:
@@ -18,7 +20,8 @@ Progress:
     stopped run can resume from already-filled Registration Date / Fuel cells.
     Single-workbook mode can also keep the old per-node chunk_XX.xlsx progress
     files. Folder mode keeps a JSON status file in addition to live workbook
-    updates.
+    updates. Interrupted files left as status "processing" are inspected on the
+    next run and resumed first when vehicles are still pending.
 """
 
 import argparse
@@ -61,12 +64,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from config import (
     MAX_SELENIUM_GRID_NODES,
     REG_DATE_FUEL_EXCEL_PATH,
+    SE_NODE_MAX_SESSIONS,
     SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
     SELENIUM_PROCESSING,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
     assert_grid_ready,
+    max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
     stop_managed_nodes,
@@ -904,9 +910,15 @@ def _run_grid_scrape(
     progress_callback=None,
 ):
     """
-    Split work across Selenium Grid nodes and merge per-node progress files.
+    Split work across Selenium Grid sessions and merge per-chunk progress files.
+
+    Layout from .env:
+      MAX_SELENIUM_GRID_NODES chrome node containers
+      SE_NODE_MAX_SESSIONS Chrome browsers per node
+      => SELENIUM_MAX_PARALLEL_SESSIONS total parallel scrapers
     """
-    chunks = split_df_for_grid(df_input, MAX_SELENIUM_GRID_NODES)
+    parallel_sessions = max_parallel_sessions()
+    chunks = split_df_for_grid(df_input, parallel_sessions)
     if not chunks:
         return df_input
 
@@ -916,7 +928,9 @@ def _run_grid_scrape(
         Path(progress_dir).mkdir(parents=True, exist_ok=True)
 
     print(
-        f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url} "
+        f"  [SELENIUM GRID] {len(chunks)} session chunk(s) on "
+        f"{MAX_SELENIUM_GRID_NODES} node(s) x {SE_NODE_MAX_SESSIONS} session(s) "
+        f"(cap {SELENIUM_MAX_PARALLEL_SESSIONS}) -> {remote_url} "
         f"| progress_dir={progress_dir if write_progress_files else 'disabled'}",
         flush=True,
     )
@@ -927,7 +941,8 @@ def _run_grid_scrape(
 
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
-            managed_nodes = start_managed_nodes(len(chunks))
+            # Start node containers only (not one container per session).
+            managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
             wait_for_grid_ready(remote_url)
         else:
             assert_grid_ready(remote_url)
@@ -1100,7 +1115,9 @@ def scrape_kerala_reg_date_fuel(
 
     print(
         f"Web scrape mode: Selenium Grid "
-        f"({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})"
+        f"({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES}, "
+        f"{MAX_SELENIUM_GRID_NODES} nodes x {SE_NODE_MAX_SESSIONS} sessions "
+        f"= {SELENIUM_MAX_PARALLEL_SESSIONS} parallel)"
     )
     return _run_grid_scrape(
         df_input,
@@ -1287,6 +1304,125 @@ def _is_file_complete(file_entry):
     return str(file_entry.get("status", "")).lower() in {"processed", "skipped"}
 
 
+def _file_status(file_entry):
+    return str((file_entry or {}).get("status", "pending") or "pending").lower()
+
+
+def count_pending_vehicles_in_workbook(excel_path):
+    """
+    Count eligible vehicle rows that still need Registration Date / Fuel.
+
+    Returns (pending_count, sheet_summaries). sheet_summaries lists
+    {sheet, pending, total_eligible} for sheets that have a vehicle column.
+    """
+    excel_path = Path(excel_path)
+    pending_total = 0
+    sheet_summaries = []
+
+    with pd.ExcelFile(excel_path) as xls:
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(xls, sheet_name=sheet_name, dtype=str)
+            veh_col = find_vehicle_reg_column(df)
+            if veh_col is None:
+                continue
+
+            for col in DETAIL_COLUMNS:
+                if col not in df.columns:
+                    df[col] = ""
+
+            df[veh_col] = df[veh_col].apply(normalize_vehicle_number)
+            valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
+            completed_mask = df.apply(_row_has_completed_details, axis=1)
+            pending = int((valid_mask & ~completed_mask).sum())
+            eligible = int(valid_mask.sum())
+            pending_total += pending
+            sheet_summaries.append(
+                {
+                    "sheet": sheet_name,
+                    "pending": pending,
+                    "total_eligible": eligible,
+                }
+            )
+
+    return pending_total, sheet_summaries
+
+
+def prioritize_workbooks_for_resume(workbooks, status, folder_path):
+    """
+    Order workbooks so interrupted 'processing' files with leftover vehicles
+    run first, then failed, then pending. Completed files stay at the end
+    (and are skipped by the main loop).
+    """
+    keyed = []
+    for workbook in workbooks:
+        key = workbook_status_key(folder_path, workbook)
+        entry = status["files"].get(key, {})
+        state = _file_status(entry)
+        keyed.append((workbook, key, entry, state))
+
+    processing_with_pending = []
+    processing_complete = []
+    failed_files = []
+    pending_files = []
+    complete_files = []
+
+    for workbook, key, entry, state in keyed:
+        if state in {"processed", "skipped"}:
+            complete_files.append((workbook, key, entry, state, 0))
+            continue
+
+        if state == "processing":
+            try:
+                pending_count, _ = count_pending_vehicles_in_workbook(workbook)
+            except Exception as exc:
+                print(
+                    f"[RESUME] Could not inspect interrupted file {key}: {exc}. "
+                    "Retrying it first.",
+                    flush=True,
+                )
+                pending_count = -1
+
+            if pending_count == 0:
+                processing_complete.append((workbook, key, entry, state, 0))
+            else:
+                processing_with_pending.append(
+                    (workbook, key, entry, state, pending_count)
+                )
+            continue
+
+        if state == "failed":
+            failed_files.append((workbook, key, entry, state, 0))
+            continue
+
+        pending_files.append((workbook, key, entry, state, 0))
+
+    if processing_with_pending:
+        print(
+            f"[RESUME] {len(processing_with_pending)} interrupted file(s) "
+            "still have pending vehicles - processing those first",
+            flush=True,
+        )
+        for _, key, _, _, pending_count in processing_with_pending:
+            label = "unknown" if pending_count < 0 else str(pending_count)
+            print(f"  - {key}: {label} pending vehicle(s)", flush=True)
+
+    if processing_complete:
+        print(
+            f"[RESUME] {len(processing_complete)} interrupted file(s) already "
+            "have all vehicles filled - marking as processed",
+            flush=True,
+        )
+
+    ordered = (
+        processing_with_pending
+        + failed_files
+        + pending_files
+        + processing_complete
+        + complete_files
+    )
+    return ordered
+
+
 def process_folder(
     folder_path,
     status_path=None,
@@ -1298,8 +1434,11 @@ def process_folder(
     """
     Process every supported workbook in a folder, using JSON status to resume.
 
-    Files with status 'processed' or 'skipped' are not run again. Files marked
-    'pending', 'processing', or 'failed' are retried on the next execution.
+    Files with status 'processed' or 'skipped' are not run again. Interrupted
+    'processing' files are inspected first: if vehicles are still pending they
+    run before new 'pending' files; if all vehicles are already filled they are
+    marked processed. 'failed' files are retried after interrupted ones.
+    Inside each workbook, already-filled Registration Date / Fuel rows are skipped.
     """
     folder_path = Path(folder_path).resolve()
     if not folder_path.is_dir():
@@ -1337,12 +1476,13 @@ def process_folder(
     print(f"Supported files found: {len(workbooks)}")
     print("=" * 80)
 
+    ordered = prioritize_workbooks_for_resume(workbooks, status, folder_path)
+
     processed = 0
     skipped = 0
     failed = 0
 
-    for workbook in workbooks:
-        key = workbook_status_key(folder_path, workbook)
+    for workbook, key, _entry, prior_state, pending_hint in ordered:
         file_entry = status["files"].setdefault(key, {"path": key})
 
         if _is_file_complete(file_entry):
@@ -1350,8 +1490,33 @@ def process_folder(
             print(f"[SKIP] Already complete: {key}")
             continue
 
+        # Interrupted run already finished all vehicles via live-save.
+        if prior_state == "processing" and pending_hint == 0:
+            file_entry.update(
+                {
+                    "status": "processed",
+                    "path": key,
+                    "completed_at": _status_timestamp(),
+                    "updated_at": _status_timestamp(),
+                    "saved": True,
+                    "error": "",
+                    "resume_note": "Marked processed on resume; no pending vehicles",
+                }
+            )
+            save_folder_status(status_path, status)
+            processed += 1
+            print(f"[RESUME] Marked complete (no pending vehicles): {key}")
+            continue
+
         print("\n" + "=" * 80)
-        print(f"[FILE] Processing: {key}")
+        if prior_state == "processing":
+            print(f"[FILE] Resuming interrupted file first: {key}")
+        elif prior_state == "failed":
+            print(f"[FILE] Retrying failed file: {key}")
+        else:
+            print(f"[FILE] Processing: {key}")
+        if pending_hint and pending_hint > 0:
+            print(f"[RESUME] Pending vehicles detected earlier: {pending_hint}")
         print("=" * 80)
 
         file_entry.update(

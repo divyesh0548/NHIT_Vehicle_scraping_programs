@@ -26,7 +26,7 @@ SELENIUM_PROCESSING = os.getenv("SELENIUM_PROCESSING", "false").strip().lower() 
     "yes",
 }
 SELENIUM_REMOTE_URL = os.getenv("SELENIUM_REMOTE_URL", "http://localhost:4444/wd/hub")
-MAX_SELENIUM_GRID_NODES = int(os.getenv("MAX_SELENIUM_GRID_NODES", "3"))
+MAX_SELENIUM_GRID_NODES = max(1, int(os.getenv("MAX_SELENIUM_GRID_NODES", "3")))
 SELENIUM_AUTO_MANAGE_NODES = os.getenv("SELENIUM_AUTO_MANAGE_NODES", "true").strip().lower() in {
     "1",
     "true",
@@ -36,6 +36,15 @@ SELENIUM_NETWORK = os.getenv("SELENIUM_NETWORK", "selenium-grid")
 SELENIUM_HUB_CONTAINER = os.getenv("SELENIUM_HUB_CONTAINER", "selenium-hub")
 SELENIUM_NODE_IMAGE = os.getenv("SELENIUM_NODE_IMAGE", "selenium/node-chrome:latest")
 SELENIUM_NODE_STARTUP_TIMEOUT = int(os.getenv("SELENIUM_NODE_STARTUP_TIMEOUT", "90"))
+# Chrome sessions allowed on each node (Grid UI: Max. Concurrency)
+SE_NODE_MAX_SESSIONS = max(1, int(os.getenv("SE_NODE_MAX_SESSIONS", "1")))
+SE_NODE_OVERRIDE_MAX_SESSIONS = os.getenv(
+    "SE_NODE_OVERRIDE_MAX_SESSIONS", "true"
+).strip().lower() in {"1", "true", "yes"}
+# Shared memory for Chrome inside each node container (e.g. 2g)
+SELENIUM_NODE_SHM_SIZE = (os.getenv("SELENIUM_NODE_SHM_SIZE") or "2g").strip() or "2g"
+# Total parallel browsers this Grid layout can run
+SELENIUM_MAX_PARALLEL_SESSIONS = MAX_SELENIUM_GRID_NODES * SE_NODE_MAX_SESSIONS
 
 # Kerala Registration Date / Fuel scraper input
 # Single .xlsx workbook or a folder containing .xlsx workbooks

@@ -10,10 +10,15 @@ from datetime import datetime
 import pandas as pd
 
 from config import (
+    MAX_SELENIUM_GRID_NODES,
+    SE_NODE_MAX_SESSIONS,
+    SE_NODE_OVERRIDE_MAX_SESSIONS,
     SELENIUM_AUTO_MANAGE_NODES,
     SELENIUM_HUB_CONTAINER,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
     SELENIUM_NETWORK,
     SELENIUM_NODE_IMAGE,
+    SELENIUM_NODE_SHM_SIZE,
     SELENIUM_NODE_STARTUP_TIMEOUT,
     SELENIUM_REMOTE_URL,
 )
@@ -27,6 +32,11 @@ def split_dataframe(df, max_chunks):
     chunk_count = max(1, min(int(max_chunks), len(df)))
     chunk_size = math.ceil(len(df) / chunk_count)
     return [df.iloc[i : i + chunk_size].copy() for i in range(0, len(df), chunk_size)]
+
+
+def max_parallel_sessions():
+    """Total Chrome sessions the configured Grid layout can run."""
+    return max(1, int(SELENIUM_MAX_PARALLEL_SESSIONS))
 
 
 def run_docker_command(args, check=True):
@@ -89,11 +99,29 @@ def ensure_hub_on_network(hub_name=SELENIUM_HUB_CONTAINER, network=SELENIUM_NETW
         ) from exc
 
 
-def start_managed_nodes(node_count, hub_name=SELENIUM_HUB_CONTAINER, network=SELENIUM_NETWORK):
-    """Create Chrome node containers; returns names started by this run."""
+def start_managed_nodes(node_count=None, hub_name=SELENIUM_HUB_CONTAINER, network=SELENIUM_NETWORK):
+    """
+    Create Chrome node containers; returns names started by this run.
+
+    Each node is started with SE_NODE_MAX_SESSIONS so one node can host
+    multiple concurrent Chrome browsers (Grid UI: Max. Concurrency).
+    """
+    if node_count is None:
+        node_count = MAX_SELENIUM_GRID_NODES
+    node_count = max(1, int(node_count))
+
     ensure_network_exists(network)
     ensure_hub_container_running(hub_name)
     ensure_hub_on_network(hub_name, network)
+
+    override_value = "true" if SE_NODE_OVERRIDE_MAX_SESSIONS else "false"
+    print(
+        f"Starting {node_count} Chrome node(s) with "
+        f"SE_NODE_MAX_SESSIONS={SE_NODE_MAX_SESSIONS} "
+        f"(override={override_value}, shm={SELENIUM_NODE_SHM_SIZE}) "
+        f"-> up to {node_count * SE_NODE_MAX_SESSIONS} parallel sessions",
+        flush=True,
+    )
 
     started_nodes = []
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -109,12 +137,18 @@ def start_managed_nodes(node_count, hub_name=SELENIUM_HUB_CONTAINER, network=SEL
                 node_name,
                 "--network",
                 network,
+                "--shm-size",
+                SELENIUM_NODE_SHM_SIZE,
                 "-e",
                 f"SE_EVENT_BUS_HOST={hub_name}",
                 "-e",
                 "SE_EVENT_BUS_PUBLISH_PORT=4442",
                 "-e",
                 "SE_EVENT_BUS_SUBSCRIBE_PORT=4443",
+                "-e",
+                f"SE_NODE_MAX_SESSIONS={SE_NODE_MAX_SESSIONS}",
+                "-e",
+                f"SE_NODE_OVERRIDE_MAX_SESSIONS={override_value}",
                 SELENIUM_NODE_IMAGE,
             ],
             check=True,
@@ -132,34 +166,110 @@ def stop_managed_nodes(node_names):
             print(f"Failed to remove node {node_name}: {exc}", flush=True)
 
 
-def assert_grid_ready(remote_url=SELENIUM_REMOTE_URL):
+def _grid_status(remote_url=SELENIUM_REMOTE_URL):
     status_url = build_grid_status_url(remote_url)
     with urllib.request.urlopen(status_url, timeout=5) as response:
         payload = json.loads(response.read().decode("utf-8"))
-
     value = payload.get("value", {})
-    ready = bool(value.get("ready"))
     nodes = value.get("nodes") or []
-    if not ready:
+    up_nodes = [
+        node
+        for node in nodes
+        if str(node.get("availability", "")).upper() in {"UP", ""}
+    ]
+    total_sessions = 0
+    for node in up_nodes:
+        try:
+            total_sessions += int(node.get("maxSessions") or 0)
+        except (TypeError, ValueError):
+            continue
+    return {
+        "status_url": status_url,
+        "ready": bool(value.get("ready")),
+        "nodes": nodes,
+        "up_nodes": up_nodes,
+        "registered_nodes": len(nodes),
+        "up_node_count": len(up_nodes),
+        "total_max_sessions": total_sessions,
+    }
+
+
+def assert_grid_ready(
+    remote_url=SELENIUM_REMOTE_URL,
+    min_nodes=1,
+    min_sessions=1,
+):
+    """
+    Require enough UP nodes/session slots.
+
+    Do not require status.ready == True: that flag becomes false when slots are
+    temporarily full, which is normal once scraping starts.
+    """
+    min_nodes = max(1, int(min_nodes or 1))
+    min_sessions = max(1, int(min_sessions or 1))
+    info = _grid_status(remote_url)
+
+    if info["up_node_count"] < min_nodes:
         raise RuntimeError(
-            f"Selenium Grid is not ready at {status_url}. registered_nodes={len(nodes)}"
+            f"Selenium Grid at {info['status_url']} has "
+            f"{info['up_node_count']}/{min_nodes} UP node(s) "
+            f"(registered={info['registered_nodes']}, "
+            f"ready={info['ready']}, max_sessions={info['total_max_sessions']})"
+        )
+    if info["total_max_sessions"] < min_sessions:
+        raise RuntimeError(
+            f"Selenium Grid at {info['status_url']} has only "
+            f"{info['total_max_sessions']}/{min_sessions} session slot(s) "
+            f"across {info['up_node_count']} UP node(s)"
         )
 
 
-def wait_for_grid_ready(remote_url=SELENIUM_REMOTE_URL, timeout_seconds=SELENIUM_NODE_STARTUP_TIMEOUT):
+def wait_for_grid_ready(
+    remote_url=SELENIUM_REMOTE_URL,
+    timeout_seconds=SELENIUM_NODE_STARTUP_TIMEOUT,
+    min_nodes=None,
+    min_sessions=None,
+):
+    """
+    Wait until the expected node/session capacity is registered.
+
+    Defaults to MAX_SELENIUM_GRID_NODES and SELENIUM_MAX_PARALLEL_SESSIONS so we
+    do not start 25 workers against a single early node.
+    """
+    if min_nodes is None:
+        min_nodes = MAX_SELENIUM_GRID_NODES
+    if min_sessions is None:
+        min_sessions = SELENIUM_MAX_PARALLEL_SESSIONS
+
     deadline = time.time() + timeout_seconds
     last_error = None
+    print(
+        f"Waiting for Grid capacity: >= {min_nodes} node(s), "
+        f">= {min_sessions} session slot(s) (timeout {timeout_seconds}s)",
+        flush=True,
+    )
     while time.time() < deadline:
         try:
-            assert_grid_ready(remote_url)
+            assert_grid_ready(
+                remote_url,
+                min_nodes=min_nodes,
+                min_sessions=min_sessions,
+            )
+            info = _grid_status(remote_url)
+            print(
+                f"Grid capacity ready: {info['up_node_count']} UP node(s), "
+                f"{info['total_max_sessions']} session slot(s)",
+                flush=True,
+            )
             return
         except Exception as exc:
             last_error = exc
             time.sleep(3)
     raise RuntimeError(
-        f"Selenium Grid did not become ready within {timeout_seconds}s. {last_error}. "
+        f"Selenium Grid did not reach required capacity within {timeout_seconds}s. "
+        f"{last_error}. "
         f"Check: (1) SELENIUM_HUB_CONTAINER={SELENIUM_HUB_CONTAINER} matches `docker ps`, "
         f"(2) hub is on network {SELENIUM_NETWORK}, "
-        f"(3) http://localhost:4444/status shows ready=true, "
+        f"(3) http://localhost:4444/status shows {min_nodes} UP nodes, "
         f"(4) `docker logs <node-name>` if nodes exit immediately."
     )

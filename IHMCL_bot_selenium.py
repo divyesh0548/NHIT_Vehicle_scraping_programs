@@ -38,21 +38,33 @@ def setup_driver(headless=False, remote_url=None):
 
 
 def ensure_grid_ready(remote_url, timeout=5):
-    """Fail fast if Selenium Grid is reachable but has no ready nodes."""
+    """
+    Fail fast if Selenium Grid is unreachable or has no usable nodes.
+
+    Note: Grid status "ready=false" often only means all slots are busy right
+    now. That is normal under load; new session requests should still be
+    allowed so the hub can queue them. We only require at least one UP node.
+    """
     status_url = build_grid_status_url(remote_url)
     try:
         with urllib.request.urlopen(status_url, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
-        raise RuntimeError(f"Could not reach Selenium Grid status endpoint: {status_url}. {exc}") from exc
+        raise RuntimeError(
+            f"Could not reach Selenium Grid status endpoint: {status_url}. {exc}"
+        ) from exc
 
     value = payload.get("value", {})
-    ready = bool(value.get("ready"))
     nodes = value.get("nodes") or []
-    if not ready:
+    up_nodes = [
+        node
+        for node in nodes
+        if str(node.get("availability", "")).upper() in {"UP", ""}
+    ]
+    if not up_nodes:
         raise RuntimeError(
-            f"Selenium Grid is not ready at {status_url}. "
-            f"ready={ready}, registered_nodes={len(nodes)}"
+            f"Selenium Grid has no UP nodes at {status_url}. "
+            f"ready={bool(value.get('ready'))}, registered_nodes={len(nodes)}"
         )
 
 

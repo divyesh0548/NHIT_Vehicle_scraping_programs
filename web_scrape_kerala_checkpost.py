@@ -184,9 +184,32 @@ def setup_driver(remote_url=None):
         if remote_url:
             from IHMCL_bot_selenium import ensure_grid_ready
 
-            ensure_grid_ready(remote_url)
-            driver = webdriver.Remote(command_executor=remote_url, options=options)
-            print(f"Browser connected to Selenium Grid: {remote_url}")
+            # Retry session creation: Grid may briefly report no free slots while
+            # many workers connect at once. Hub can queue once we keep trying.
+            last_remote_error = None
+            driver = None
+            for attempt in range(1, 13):
+                try:
+                    ensure_grid_ready(remote_url)
+                    driver = webdriver.Remote(
+                        command_executor=remote_url, options=options
+                    )
+                    print(
+                        f"Browser connected to Selenium Grid: {remote_url}"
+                        + (f" (attempt {attempt})" if attempt > 1 else "")
+                    )
+                    break
+                except Exception as remote_exc:
+                    last_remote_error = remote_exc
+                    print(
+                        f"  [WARN] Grid session attempt {attempt}/12 failed: {remote_exc}",
+                        flush=True,
+                    )
+                    time.sleep(min(5, attempt))
+            if driver is None:
+                raise RuntimeError(
+                    f"Could not create Grid session at {remote_url}: {last_remote_error}"
+                )
         else:
             try:
                 driver = webdriver.Chrome(options=options)
