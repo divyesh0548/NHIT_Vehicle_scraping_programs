@@ -1,10 +1,5 @@
 {
   "files": {
-    ".Raksha - kerala- Jan26- mar26_part_34.live_save.tmp.xlsx": {
-      "created_at": "2026-10-09T12:28:09",
-      "path": ".Raksha - kerala- Jan26- mar26_part_34.live_save.tmp.xlsx",
-      "status": "pending"
-    },
     "Raksha - kerala- Jan26- mar26_part_1.xlsx": {
       "created_at": "2026-10-03T10:14:00",
       "error": "",
@@ -24,7 +19,7 @@
       "status": "pending"
     },
     "Raksha - kerala- Jan26- mar26_part_12.xlsx": {
-      "completed_at": "2026-10-07T11:43:59",
+      "completed_at": "2026-10-09T13:22:59",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_12.xlsx",
@@ -34,12 +29,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-07T09:48:02",
+      "started_at": "2026-10-09T13:01:37",
       "status": "processed",
-      "updated_at": "2026-10-07T11:43:59"
+      "updated_at": "2026-10-09T13:22:59"
     },
     "Raksha - kerala- Jan26- mar26_part_13.xlsx": {
-      "completed_at": "2026-10-07T13:32:02",
+      "completed_at": "2026-10-09T13:49:29",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_13.xlsx",
@@ -49,12 +44,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-07T11:43:59",
+      "started_at": "2026-10-09T13:22:59",
       "status": "processed",
-      "updated_at": "2026-10-07T13:32:02"
+      "updated_at": "2026-10-09T13:49:29"
     },
     "Raksha - kerala- Jan26- mar26_part_14.xlsx": {
-      "completed_at": "2026-10-07T15:19:49",
+      "completed_at": "2026-10-09T14:15:03",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_14.xlsx",
@@ -64,12 +59,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-07T13:32:02",
+      "started_at": "2026-10-09T13:49:29",
       "status": "processed",
-      "updated_at": "2026-10-07T15:19:49"
+      "updated_at": "2026-10-09T14:15:03"
     },
     "Raksha - kerala- Jan26- mar26_part_15.xlsx": {
-      "completed_at": "2026-10-07T17:51:33",
+      "completed_at": "2026-10-09T14:35:28",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_15.xlsx",
@@ -79,12 +74,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-07T15:54:08",
+      "started_at": "2026-10-09T14:15:03",
       "status": "processed",
-      "updated_at": "2026-10-07T17:51:33"
+      "updated_at": "2026-10-09T14:35:28"
     },
     "Raksha - kerala- Jan26- mar26_part_16.xlsx": {
-      "completed_at": "2026-10-08T11:43:42",
+      "completed_at": "2026-10-09T14:40:56",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_16.xlsx",
@@ -94,12 +89,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T09:46:31",
+      "started_at": "2026-10-09T14:35:29",
       "status": "processed",
-      "updated_at": "2026-10-08T11:43:42"
+      "updated_at": "2026-10-09T14:40:56"
     },
     "Raksha - kerala- Jan26- mar26_part_17.xlsx": {
-      "completed_at": "2026-10-08T16:36:39",
+      "completed_at": "2026-10-09T15:08:33",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_17.xlsx",
@@ -109,12 +104,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T14:41:21",
+      "started_at": "2026-10-09T14:40:57",
       "status": "processed",
-      "updated_at": "2026-10-08T16:36:39"
+      "updated_at": "2026-10-09T15:08:33"
     },
     "Raksha - kerala- Jan26- mar26_part_18.xlsx": {
-      "completed_at": "2026-10-08T16:41:51",
+      "completed_at": "2026-10-09T15:43:46",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_18.xlsx",
@@ -124,12 +119,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T16:36:39",
+      "started_at": "2026-10-09T15:08:33",
       "status": "processed",
-      "updated_at": "2026-10-08T16:41:51"
+      "updated_at": "2026-10-09T15:43:46"
     },
     "Raksha - kerala- Jan26- mar26_part_19.xlsx": {
-      "completed_at": "2026-10-08T16:47:05",
+      "completed_at": "2026-10-09T16:23:26",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_19.xlsx",
@@ -139,9 +134,9 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T16:41:51",
+      "started_at": "2026-10-09T15:43:47",
       "status": "processed",
-      "updated_at": "2026-10-08T16:47:05"
+      "updated_at": "2026-10-09T16:23:26"
     },
     "Raksha - kerala- Jan26- mar26_part_2.xlsx": {
       "created_at": "2026-10-03T10:14:00",
@@ -162,7 +157,7 @@
       "status": "pending"
     },
     "Raksha - kerala- Jan26- mar26_part_22.xlsx": {
-      "completed_at": "2026-10-08T16:52:44",
+      "completed_at": "2026-10-09T17:01:52",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_22.xlsx",
@@ -172,12 +167,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T16:47:05",
+      "started_at": "2026-10-09T16:23:26",
       "status": "processed",
-      "updated_at": "2026-10-08T16:52:44"
+      "updated_at": "2026-10-09T17:01:52"
     },
     "Raksha - kerala- Jan26- mar26_part_23.xlsx": {
-      "completed_at": "2026-10-08T16:57:52",
+      "completed_at": "2026-10-09T17:32:22",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_23.xlsx",
@@ -187,12 +182,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T16:52:44",
+      "started_at": "2026-10-09T17:01:52",
       "status": "processed",
-      "updated_at": "2026-10-08T16:57:52"
+      "updated_at": "2026-10-09T17:32:22"
     },
     "Raksha - kerala- Jan26- mar26_part_24.xlsx": {
-      "completed_at": "2026-10-08T17:03:00",
+      "completed_at": "2026-10-09T18:10:00",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_24.xlsx",
@@ -202,12 +197,12 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T16:57:52",
+      "started_at": "2026-10-09T17:32:22",
       "status": "processed",
-      "updated_at": "2026-10-08T17:03:00"
+      "updated_at": "2026-10-09T18:10:00"
     },
     "Raksha - kerala- Jan26- mar26_part_25.xlsx": {
-      "completed_at": "2026-10-08T17:08:11",
+      "completed_at": "2026-10-09T18:46:33",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_25.xlsx",
@@ -217,12 +212,11 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T17:03:00",
+      "started_at": "2026-10-09T18:10:00",
       "status": "processed",
-      "updated_at": "2026-10-08T17:08:11"
+      "updated_at": "2026-10-09T18:46:33"
     },
     "Raksha - kerala- Jan26- mar26_part_26.xlsx": {
-      "completed_at": "2026-10-08T17:13:20",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_26.xlsx",
@@ -232,12 +226,11 @@
         "Sheet1"
       ],
       "skipped_sheets": [],
-      "started_at": "2026-10-08T17:08:11",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:13:20"
+      "started_at": "2026-10-09T18:46:33",
+      "status": "processing",
+      "updated_at": "2026-10-09T18:46:33"
     },
     "Raksha - kerala- Jan26- mar26_part_27.xlsx": {
-      "completed_at": "2026-10-08T17:18:33",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_27.xlsx",
@@ -248,11 +241,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:13:20",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:18:33"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_28.xlsx": {
-      "completed_at": "2026-10-08T17:23:42",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_28.xlsx",
@@ -263,11 +255,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:18:33",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:23:42"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_29.xlsx": {
-      "completed_at": "2026-10-08T17:30:12",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_29.xlsx",
@@ -278,11 +269,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:23:42",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:30:12"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_3.xlsx": {
-      "completed_at": "2026-10-08T17:35:22",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_3.xlsx",
@@ -293,11 +283,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:30:12",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:35:22"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_30.xlsx": {
-      "completed_at": "2026-10-08T17:40:26",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_30.xlsx",
@@ -308,11 +297,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:35:22",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:40:26"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_31.xlsx": {
-      "completed_at": "2026-10-08T17:45:34",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_31.xlsx",
@@ -323,11 +311,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:40:26",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:45:34"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_32.xlsx": {
-      "completed_at": "2026-10-08T17:50:44",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_32.xlsx",
@@ -338,11 +325,10 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-08T17:45:34",
-      "status": "processed",
-      "updated_at": "2026-10-08T17:50:44"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_33.xlsx": {
-      "completed_at": "2026-10-09T11:18:17",
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_33.xlsx",
@@ -353,16 +339,22 @@
       ],
       "skipped_sheets": [],
       "started_at": "2026-10-09T09:44:36",
-      "status": "processed",
-      "updated_at": "2026-10-09T11:18:17"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_34.xlsx": {
       "created_at": "2026-10-03T10:14:00",
       "error": "",
       "path": "Raksha - kerala- Jan26- mar26_part_34.xlsx",
+      "progress_dir": null,
+      "saved": true,
+      "scraped_sheets": [
+        "Sheet1"
+      ],
+      "skipped_sheets": [],
       "started_at": "2026-10-09T12:28:09",
-      "status": "processing",
-      "updated_at": "2026-10-09T12:28:09"
+      "status": "pending",
+      "updated_at": "2026-10-09T13:00:29"
     },
     "Raksha - kerala- Jan26- mar26_part_35.xlsx": {
       "created_at": "2026-10-03T10:14:00",
@@ -476,6 +468,6 @@
     }
   },
   "folder": "C:\\Divyesh\\S_T_Vehicle_processing\\Raksha",
-  "updated_at": "2026-10-09T12:28:09",
+  "updated_at": "2026-10-09T18:46:33",
   "version": 1
 }

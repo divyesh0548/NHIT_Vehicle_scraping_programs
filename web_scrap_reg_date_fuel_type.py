@@ -20,8 +20,15 @@ Progress:
     stopped run can resume from already-filled Registration Date / Fuel cells.
     Single-workbook mode can also keep the old per-node chunk_XX.xlsx progress
     files. Folder mode keeps a JSON status file in addition to live workbook
-    updates. Interrupted files left as status "processing" are inspected on the
-    next run and resumed first when vehicles are still pending.
+    updates.
+
+Folder mode startup:
+    1. Scan every workbook in the folder.
+    2. Ensure each file has a JSON status entry (create if missing).
+    3. Mark status "pending" when any eligible vehicle is missing data;
+       mark "processed" when all eligible vehicles already have data.
+    4. Process pending files one after another, scraping only missing rows
+       without clearing existing Registration Date / Fuel values.
 """
 
 import argparse
@@ -629,15 +636,24 @@ class ExcelLiveUpdater:
         print(f"[LIVE SAVE] Saved {reason}: {self.excel_path}", flush=True)
 
     def update_row(self, row_index, details):
+        """Update only the scraped row's detail columns; never wipe other rows."""
         with self.lock:
             excel_row = int(row_index) + 2
             for column_name in self.detail_columns:
                 if column_name not in self.column_indexes:
                     continue
-                self.sheet.cell(
+                new_value = details.get(column_name, "")
+                if new_value is None:
+                    new_value = ""
+                cell = self.sheet.cell(
                     row=excel_row,
                     column=self.column_indexes[column_name],
-                ).value = details.get(column_name, "")
+                )
+                # Do not blank an already-filled cell with an empty update.
+                existing = "" if cell.value is None else str(cell.value).strip()
+                if existing and not str(new_value).strip():
+                    continue
+                cell.value = new_value
             self.pending_saves += 1
             if self.pending_saves >= self.save_every:
                 self._save_locked(reason=f"row {excel_row}")
@@ -1181,7 +1197,11 @@ def discover_workbooks(folder_path, recursive=False):
     for path in iterator:
         if not path.is_file():
             continue
-        if path.name.startswith("~$"):
+        name = path.name
+        # Skip Excel lock files and live-save temp workbooks.
+        if name.startswith("~$") or name.startswith("."):
+            continue
+        if ".live_save.tmp" in name.lower() or ".final_save.tmp" in name.lower():
             continue
         if path.suffix.lower() in SUPPORTED_WORKBOOK_EXTENSIONS:
             workbooks.append(path)
@@ -1247,9 +1267,17 @@ def process_workbook_in_place(
             skipped_sheets.append(sheet_name)
             continue
 
+        # Preserve already-filled detail columns; scrape only pending rows.
+        for col in DETAIL_COLUMNS:
+            if col not in df_sheet.columns:
+                df_sheet[col] = ""
+            else:
+                df_sheet[col] = df_sheet[col].fillna("").astype(str).replace({"nan": ""})
+
         print(
             f"[OK] Sheet '{sheet_name}': found vehicle column '{veh_col}' "
-            f"({len(df_sheet)} rows) - starting web scrape"
+            f"({len(df_sheet)} rows) - starting web scrape "
+            f"(existing Registration Date / Fuel values are kept)"
         )
         live_updater = (
             ExcelLiveUpdater(
@@ -1347,80 +1375,131 @@ def count_pending_vehicles_in_workbook(excel_path):
     return pending_total, sheet_summaries
 
 
-def prioritize_workbooks_for_resume(workbooks, status, folder_path):
+def sync_folder_status_from_disk(workbooks, status, folder_path):
     """
-    Order workbooks so interrupted 'processing' files with leftover vehicles
-    run first, then failed, then pending. Completed files stay at the end
-    (and are skipped by the main loop).
+    Ensure every on-disk workbook has a JSON entry, then set status from data:
+
+    - pending   : at least one eligible vehicle is missing Registration Date / Fuel
+    - processed : all eligible vehicles already have data (existing values kept)
+    - skipped   : workbook has no vehicle-registration sheet
+    - failed    : workbook could not be read during the startup scan
+
+    Returns list of (workbook, key, pending_count) for files that still need scraping.
     """
-    keyed = []
+    now = _status_timestamp()
+    created = 0
+    marked_pending = 0
+    marked_processed = 0
+    marked_skipped = 0
+    marked_failed = 0
+    queue = []
+
+    print("=" * 80)
+    print("STARTUP SCAN: syncing folder files into status JSON")
+    print("=" * 80)
+
+    known_keys = set()
     for workbook in workbooks:
         key = workbook_status_key(folder_path, workbook)
-        entry = status["files"].get(key, {})
-        state = _file_status(entry)
-        keyed.append((workbook, key, entry, state))
+        known_keys.add(key)
+        file_entry = status["files"].get(key)
+        if file_entry is None:
+            file_entry = {
+                "status": "pending",
+                "path": key,
+                "created_at": now,
+            }
+            status["files"][key] = file_entry
+            created += 1
+            print(f"[JSON] Created status entry: {key}")
+        else:
+            file_entry.setdefault("path", key)
+            file_entry.setdefault("created_at", now)
 
-    processing_with_pending = []
-    processing_complete = []
-    failed_files = []
-    pending_files = []
-    complete_files = []
-
-    for workbook, key, entry, state in keyed:
-        if state in {"processed", "skipped"}:
-            complete_files.append((workbook, key, entry, state, 0))
+        try:
+            pending_count, sheet_summaries = count_pending_vehicles_in_workbook(workbook)
+        except Exception as exc:
+            file_entry.update(
+                {
+                    "status": "failed",
+                    "path": key,
+                    "updated_at": now,
+                    "error": f"Startup scan failed: {exc}",
+                    "pending_vehicles": None,
+                }
+            )
+            marked_failed += 1
+            print(f"[SCAN][FAIL] {key}: {exc}")
             continue
 
-        if state == "processing":
-            try:
-                pending_count, _ = count_pending_vehicles_in_workbook(workbook)
-            except Exception as exc:
-                print(
-                    f"[RESUME] Could not inspect interrupted file {key}: {exc}. "
-                    "Retrying it first.",
-                    flush=True,
-                )
-                pending_count = -1
+        eligible_total = sum(item["total_eligible"] for item in sheet_summaries)
+        file_entry["pending_vehicles"] = pending_count
+        file_entry["eligible_vehicles"] = eligible_total
+        file_entry["path"] = key
+        file_entry["updated_at"] = now
+        file_entry["scan_at"] = now
 
-            if pending_count == 0:
-                processing_complete.append((workbook, key, entry, state, 0))
-            else:
-                processing_with_pending.append(
-                    (workbook, key, entry, state, pending_count)
-                )
+        if not sheet_summaries:
+            file_entry.update(
+                {
+                    "status": "skipped",
+                    "error": "No vehicle registration sheet found",
+                    "completed_at": now,
+                }
+            )
+            marked_skipped += 1
+            print(f"[SCAN] skipped (no vehicle sheet): {key}")
             continue
 
-        if state == "failed":
-            failed_files.append((workbook, key, entry, state, 0))
+        if pending_count > 0:
+            file_entry.update(
+                {
+                    "status": "pending",
+                    "error": "",
+                }
+            )
+            # Drop stale completion markers so the file is eligible again.
+            file_entry.pop("completed_at", None)
+            file_entry.pop("resume_note", None)
+            marked_pending += 1
+            queue.append((workbook, key, pending_count))
+            print(
+                f"[SCAN] pending: {key} "
+                f"({pending_count} vehicle(s) still need data; existing values kept)"
+            )
+        else:
+            file_entry.update(
+                {
+                    "status": "processed",
+                    "saved": True,
+                    "error": "",
+                    "completed_at": now,
+                    "resume_note": "Startup scan: all eligible vehicles already have data",
+                }
+            )
+            marked_processed += 1
+            print(
+                f"[SCAN] processed: {key} "
+                f"(0 pending; {eligible_total} vehicle(s) already filled)"
+            )
+
+    # Keep orphan JSON keys, but note files that disappeared from disk.
+    for key, file_entry in status["files"].items():
+        if key in known_keys:
             continue
+        if str(file_entry.get("missing_on_disk", "")).lower() == "true":
+            continue
+        file_entry["missing_on_disk"] = True
+        file_entry["updated_at"] = now
+        print(f"[JSON] Entry exists but file missing on disk (left unchanged): {key}")
 
-        pending_files.append((workbook, key, entry, state, 0))
+    print("-" * 80)
+    print(f"Scan complete: created={created}, pending={marked_pending}, "
+          f"processed={marked_processed}, skipped={marked_skipped}, failed={marked_failed}")
+    print(f"Files queued for scraping: {len(queue)}")
+    print("=" * 80)
 
-    if processing_with_pending:
-        print(
-            f"[RESUME] {len(processing_with_pending)} interrupted file(s) "
-            "still have pending vehicles - processing those first",
-            flush=True,
-        )
-        for _, key, _, _, pending_count in processing_with_pending:
-            label = "unknown" if pending_count < 0 else str(pending_count)
-            print(f"  - {key}: {label} pending vehicle(s)", flush=True)
-
-    if processing_complete:
-        print(
-            f"[RESUME] {len(processing_complete)} interrupted file(s) already "
-            "have all vehicles filled - marking as processed",
-            flush=True,
-        )
-
-    ordered = (
-        processing_with_pending
-        + failed_files
-        + pending_files
-        + processing_complete
-        + complete_files
-    )
-    return ordered
+    return queue
 
 
 def process_folder(
@@ -1434,11 +1513,13 @@ def process_folder(
     """
     Process every supported workbook in a folder, using JSON status to resume.
 
-    Files with status 'processed' or 'skipped' are not run again. Interrupted
-    'processing' files are inspected first: if vehicles are still pending they
-    run before new 'pending' files; if all vehicles are already filled they are
-    marked processed. 'failed' files are retried after interrupted ones.
-    Inside each workbook, already-filled Registration Date / Fuel rows are skipped.
+    Startup:
+      1. Discover workbooks on disk.
+      2. Create missing JSON entries.
+      3. Mark each file pending/processed/skipped based on whether any
+         eligible vehicle is still missing Registration Date / Fuel.
+      4. Scrape queued files one after another.
+         Already-filled vehicle rows are never cleared or re-scraped.
     """
     folder_path = Path(folder_path).resolve()
     if not folder_path.is_dir():
@@ -1455,19 +1536,6 @@ def process_folder(
     status = load_folder_status(status_path)
     status["folder"] = str(folder_path)
 
-    for workbook in workbooks:
-        key = workbook_status_key(folder_path, workbook)
-        status["files"].setdefault(
-            key,
-            {
-                "status": "pending",
-                "path": key,
-                "created_at": _status_timestamp(),
-            },
-        )
-
-    save_folder_status(status_path, status)
-
     print("=" * 80)
     print("FOLDER PROCESSING")
     print("=" * 80)
@@ -1476,22 +1544,45 @@ def process_folder(
     print(f"Supported files found: {len(workbooks)}")
     print("=" * 80)
 
-    ordered = prioritize_workbooks_for_resume(workbooks, status, folder_path)
+    queue = sync_folder_status_from_disk(workbooks, status, folder_path)
+    save_folder_status(status_path, status)
 
     processed = 0
     skipped = 0
     failed = 0
 
-    for workbook, key, _entry, prior_state, pending_hint in ordered:
+    # Also retry files left as failed from an earlier run if they still exist.
+    queued_keys = {key for _, key, _ in queue}
+    for workbook in workbooks:
+        key = workbook_status_key(folder_path, workbook)
+        if key in queued_keys:
+            continue
+        if _file_status(status["files"].get(key, {})) == "failed":
+            try:
+                pending_count, _ = count_pending_vehicles_in_workbook(workbook)
+            except Exception:
+                pending_count = -1
+            if pending_count != 0:
+                queue.append((workbook, key, pending_count))
+                queued_keys.add(key)
+
+    # Stable one-file-after-another order.
+    queue.sort(key=lambda item: str(item[1]).lower())
+
+    for workbook, key, pending_hint in queue:
         file_entry = status["files"].setdefault(key, {"path": key})
 
-        if _is_file_complete(file_entry):
-            skipped += 1
-            print(f"[SKIP] Already complete: {key}")
-            continue
+        try:
+            pending_count, _ = count_pending_vehicles_in_workbook(workbook)
+        except Exception as exc:
+            print(
+                f"[WARN] Could not re-count pending vehicles in {key}: {exc}. "
+                "Will scrape remaining rows only.",
+                flush=True,
+            )
+            pending_count = pending_hint if pending_hint else -1
 
-        # Interrupted run already finished all vehicles via live-save.
-        if prior_state == "processing" and pending_hint == 0:
+        if pending_count == 0:
             file_entry.update(
                 {
                     "status": "processed",
@@ -1500,23 +1591,19 @@ def process_folder(
                     "updated_at": _status_timestamp(),
                     "saved": True,
                     "error": "",
-                    "resume_note": "Marked processed on resume; no pending vehicles",
+                    "pending_vehicles": 0,
+                    "resume_note": "No pending vehicles; existing data kept",
                 }
             )
             save_folder_status(status_path, status)
             processed += 1
-            print(f"[RESUME] Marked complete (no pending vehicles): {key}")
+            print(f"[SKIP] No pending vehicles (existing data kept): {key}")
             continue
 
         print("\n" + "=" * 80)
-        if prior_state == "processing":
-            print(f"[FILE] Resuming interrupted file first: {key}")
-        elif prior_state == "failed":
-            print(f"[FILE] Retrying failed file: {key}")
-        else:
-            print(f"[FILE] Processing: {key}")
-        if pending_hint and pending_hint > 0:
-            print(f"[RESUME] Pending vehicles detected earlier: {pending_hint}")
+        print(f"[FILE] Processing: {key}")
+        print(f"[RESUME] Pending vehicles only: {pending_count}")
+        print("Existing Registration Date / Fuel values will be preserved.")
         print("=" * 80)
 
         file_entry.update(
@@ -1525,6 +1612,7 @@ def process_folder(
                 "path": key,
                 "started_at": _status_timestamp(),
                 "updated_at": _status_timestamp(),
+                "pending_vehicles": pending_count,
                 "error": "",
             }
         )
@@ -1537,26 +1625,56 @@ def process_folder(
                 live_save=live_save,
                 live_save_every=live_save_every,
             )
+            # Re-check after scrape so partial failures stay pending/failed correctly.
+            try:
+                remaining_after, _ = count_pending_vehicles_in_workbook(workbook)
+            except Exception:
+                remaining_after = 0 if result["saved"] else -1
+
+            if result["saved"] and remaining_after == 0:
+                next_status = "processed"
+            elif result["saved"] and remaining_after > 0:
+                next_status = "pending"
+            elif not result["saved"]:
+                next_status = "skipped"
+            else:
+                next_status = "failed"
+
             file_entry.update(
                 {
-                    "status": "processed" if result["saved"] else "skipped",
+                    "status": next_status,
                     "completed_at": _status_timestamp(),
                     "updated_at": _status_timestamp(),
                     "saved": result["saved"],
                     "scraped_sheets": result["scraped_sheets"],
                     "skipped_sheets": result["skipped_sheets"],
                     "progress_dir": result["progress_dir"],
+                    "pending_vehicles": (
+                        remaining_after if remaining_after >= 0 else None
+                    ),
                     "error": (
                         ""
-                        if result["saved"]
-                        else "No vehicle registration sheet found"
+                        if next_status in {"processed", "pending"}
+                        else (
+                            "No vehicle registration sheet found"
+                            if next_status == "skipped"
+                            else "Scrape finished with remaining/unknown pending rows"
+                        )
                     ),
                 }
             )
-            if result["saved"]:
+            if next_status == "processed":
                 processed += 1
-            else:
+            elif next_status == "skipped":
                 skipped += 1
+            elif next_status == "pending":
+                # Partial progress kept; file stays eligible next run.
+                print(
+                    f"[PARTIAL] {key}: {remaining_after} vehicle(s) still pending; "
+                    "existing filled data kept"
+                )
+            else:
+                failed += 1
             save_folder_status(status_path, status)
         except Exception as exc:
             failed += 1
@@ -1571,11 +1689,17 @@ def process_folder(
             save_folder_status(status_path, status)
             print(f"[ERROR] Failed processing {key}: {exc}")
 
+    already_complete = sum(
+        1
+        for file_entry in status["files"].values()
+        if _is_file_complete(file_entry)
+    )
+
     print("\n" + "=" * 80)
     print("FOLDER PROCESSING COMPLETE")
     print("=" * 80)
     print(f"Processed now: {processed}")
-    print(f"Skipped/already complete: {skipped}")
+    print(f"Already complete / skipped in scan: {already_complete}")
     print(f"Failed: {failed}")
     print(f"Status JSON: {status_path}")
     print("=" * 80)
@@ -1585,6 +1709,8 @@ def process_folder(
         "skipped": skipped,
         "failed": failed,
         "status_path": str(status_path),
+        "queued": len(queue),
+        "already_complete": already_complete,
     }
 
 
