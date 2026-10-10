@@ -27,8 +27,8 @@ Folder mode startup:
     2. Ensure each file has a JSON status entry (create if missing).
     3. Mark status "pending" when any eligible vehicle is missing data;
        mark "processed" when all eligible vehicles already have data.
-    4. Process pending files one after another, scraping only missing rows
-       without clearing existing Registration Date / Fuel values.
+    4. Process pending files one after another (smallest file size first),
+       scraping only missing rows without clearing existing values.
 
     Vehicles with no record on the portal are written as "no-data" in both
     columns so they are not scraped again and the file can reach processed.
@@ -1608,7 +1608,7 @@ def process_folder(
       2. Create missing JSON entries.
       3. Mark each file pending/processed/skipped based on whether any
          eligible vehicle is still missing Registration Date / Fuel.
-      4. Scrape queued files one after another.
+      4. Scrape queued files one after another, smallest file size first.
          Already-filled vehicle rows are never cleared or re-scraped.
     """
     folder_path = Path(folder_path).resolve()
@@ -1656,8 +1656,25 @@ def process_folder(
                 queue.append((workbook, key, pending_count))
                 queued_keys.add(key)
 
-    # Stable one-file-after-another order.
-    queue.sort(key=lambda item: str(item[1]).lower())
+    def _workbook_size_bytes(path):
+        try:
+            return Path(path).stat().st_size
+        except OSError:
+            return float("inf")
+
+    # Process smallest workbooks first (tie-break by name).
+    queue.sort(
+        key=lambda item: (_workbook_size_bytes(item[0]), str(item[1]).lower())
+    )
+    if queue:
+        print("Processing order (smallest file size first):")
+        for workbook, key, pending_count in queue:
+            size_bytes = _workbook_size_bytes(workbook)
+            size_kb = size_bytes / 1024.0 if size_bytes != float("inf") else -1
+            print(
+                f"  - {key}: {size_kb:.1f} KB | pending vehicles={pending_count}",
+                flush=True,
+            )
 
     for workbook, key, pending_hint in queue:
         file_entry = status["files"].setdefault(key, {"path": key})
