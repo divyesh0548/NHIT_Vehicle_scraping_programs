@@ -29,6 +29,9 @@ Folder mode startup:
        mark "processed" when all eligible vehicles already have data.
     4. Process pending files one after another, scraping only missing rows
        without clearing existing Registration Date / Fuel values.
+
+    Vehicles with no record on the portal are written as "no-data" in both
+    columns so they are not scraped again and the file can reach processed.
 """
 
 import argparse
@@ -107,6 +110,8 @@ USE_SELENIUM_GRID = SELENIUM_PROCESSING
 REGISTRATION_DATE_COLUMN = "Registration Date"
 FUEL_COLUMN = "Fuel"
 DETAIL_COLUMNS = [REGISTRATION_DATE_COLUMN, FUEL_COLUMN]
+# Written when the portal has no record / no usable fields for this vehicle.
+NO_DATA_MARKER = "no-data"
 SUPPORTED_WORKBOOK_EXTENSIONS = {".xlsx"}
 DEFAULT_STATUS_FILENAME = STATUS_FILE
 DEFAULT_LIVE_SAVE_EVERY = LIVE_SAVE_EVERY
@@ -122,6 +127,7 @@ EMPTY_DETAIL_VALUES = {
     "nan",
     "n/a",
     "N/A",
+    NO_DATA_MARKER,
     "Error",
     "Error - Input Not Found",
     "Error - Browser Restart Failed",
@@ -170,7 +176,23 @@ def _set_details(df, idx, details):
 
 
 def _na_details():
-    return {col: "N/A" for col in DETAIL_COLUMNS}
+    """Both columns set when the site has no data for this vehicle."""
+    return {col: NO_DATA_MARKER for col in DETAIL_COLUMNS}
+
+
+def _normalize_scraped_details(details):
+    """
+    Keep real scraped values; use no-data for any missing field so the row
+    is treated as complete and not scraped again.
+    """
+    normalized = {}
+    for col in DETAIL_COLUMNS:
+        value = details.get(col, "")
+        if _is_real_detail(value):
+            normalized[col] = str(value).strip()
+        else:
+            normalized[col] = NO_DATA_MARKER
+    return normalized
 
 
 def _error_details(message):
@@ -339,8 +361,8 @@ def get_vehicle_details(driver):
         fuel = _read_fuel(driver)
 
     details = {
-        REGISTRATION_DATE_COLUMN: registration_date if registration_date else "none",
-        FUEL_COLUMN: fuel if fuel else "none",
+        REGISTRATION_DATE_COLUMN: registration_date if registration_date else NO_DATA_MARKER,
+        FUEL_COLUMN: fuel if fuel else NO_DATA_MARKER,
     }
     print(
         f"Registration Date: {details[REGISTRATION_DATE_COLUMN]} | "
@@ -519,15 +541,24 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
 
             if data_appeared:
                 details = get_vehicle_details(driver)
+                normalized = _normalize_scraped_details(details)
                 if _details_look_populated(details):
-                    _set_details(df, idx, details)
+                    _set_details(df, idx, normalized)
                     print(f"[OK] Details extracted for {vehicle_no}")
                     return driver, wait, True
-                print("[WARNING] Details signal present but extracted values were empty")
+                _set_details(df, idx, _na_details())
+                print(
+                    f"[OK] Marked as {NO_DATA_MARKER} for {vehicle_no} "
+                    "(page loaded but no vehicle data on site)"
+                )
+                return driver, wait, True
 
             if popup_appeared and not data_appeared:
                 _set_details(df, idx, _na_details())
-                print("[OK] Marked as N/A (popup only, no usable details)")
+                print(
+                    f"[OK] Marked as {NO_DATA_MARKER} "
+                    "(popup only, no usable details)"
+                )
                 return driver, wait, True
 
             if retry_count < max_retries:
@@ -540,7 +571,7 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
 
             _set_details(df, idx, _na_details())
             print(
-                f"[OK] Marked as N/A for {vehicle_no} "
+                f"[OK] Marked as {NO_DATA_MARKER} for {vehicle_no} "
                 f"(no details after {max_retries + 1} attempts)"
             )
             return driver, wait, True
@@ -757,6 +788,47 @@ def find_vehicle_reg_column(df):
     return None
 
 
+def select_pending_vehicles(df_input):
+    """
+    Return only eligible rows that still need Registration Date / Fuel.
+
+    Preserves the original DataFrame index so results can be merged back onto
+    the full workbook without touching already-filled rows.
+    """
+    df = df_input.copy()
+    veh_col = find_vehicle_reg_column(df)
+    if veh_col is None:
+        return df.iloc[0:0].copy(), None
+
+    for col in DETAIL_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+        else:
+            df[col] = df[col].fillna("").astype(str).replace({"nan": ""})
+
+    df[veh_col] = df[veh_col].apply(normalize_vehicle_number)
+    valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
+    completed_mask = df.apply(_row_has_completed_details, axis=1)
+    pending_df = df[valid_mask & ~completed_mask].copy()
+    return pending_df, veh_col
+
+
+def split_pending_vehicles_evenly(df_input, max_chunks):
+    """
+    Split pending vehicles evenly across Grid session chunks.
+
+    Unlike splitting the full sheet first, this balances only the rows that
+    still need scraping, so partially completed files do not create chunks
+    with 50 pending vs 10 pending.
+    """
+    pending_df, veh_col = select_pending_vehicles(df_input)
+    if pending_df.empty:
+        return [], pending_df, veh_col
+
+    chunks = split_df_for_grid(pending_df, max_chunks)
+    return chunks, pending_df, veh_col
+
+
 def _scrape_kerala_reg_date_fuel_impl(
     df_input,
     progress_path=None,
@@ -926,15 +998,27 @@ def _run_grid_scrape(
     progress_callback=None,
 ):
     """
-    Split work across Selenium Grid sessions and merge per-chunk progress files.
+    Split pending vehicles evenly across Selenium Grid sessions and merge results.
 
     Layout from .env:
       MAX_SELENIUM_GRID_NODES chrome node containers
       SE_NODE_MAX_SESSIONS Chrome browsers per node
       => SELENIUM_MAX_PARALLEL_SESSIONS total parallel scrapers
+
+    Already-filled Registration Date / Fuel rows stay on the base dataframe and
+    are not included in chunk work, so partial files get balanced pending loads.
     """
     parallel_sessions = max_parallel_sessions()
-    chunks = split_df_for_grid(df_input, parallel_sessions)
+    chunks, pending_df, _veh_col = split_pending_vehicles_evenly(
+        df_input, parallel_sessions
+    )
+    if pending_df is None or pending_df.empty:
+        print(
+            "  [SELENIUM GRID] No pending vehicles to scrape "
+            "(existing filled data kept)",
+            flush=True,
+        )
+        return df_input
     if not chunks:
         return df_input
 
@@ -943,10 +1027,16 @@ def _run_grid_scrape(
     elif write_progress_files:
         Path(progress_dir).mkdir(parents=True, exist_ok=True)
 
+    sizes = [len(chunk) for chunk in chunks]
     print(
-        f"  [SELENIUM GRID] {len(chunks)} session chunk(s) on "
+        f"  [SELENIUM GRID] {len(pending_df)} pending vehicle(s) split evenly into "
+        f"{len(chunks)} session chunk(s) on "
         f"{MAX_SELENIUM_GRID_NODES} node(s) x {SE_NODE_MAX_SESSIONS} session(s) "
-        f"(cap {SELENIUM_MAX_PARALLEL_SESSIONS}) -> {remote_url} "
+        f"(cap {SELENIUM_MAX_PARALLEL_SESSIONS}) -> {remote_url}",
+        flush=True,
+    )
+    print(
+        f"  [SELENIUM GRID] chunk sizes: {sizes} "
         f"| progress_dir={progress_dir if write_progress_files else 'disabled'}",
         flush=True,
     )
