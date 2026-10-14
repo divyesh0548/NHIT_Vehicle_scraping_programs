@@ -25,11 +25,13 @@ from config import (
     DB_USER,
     MAX_SELENIUM_GRID_NODES,
     SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
+    SELENIUM_MODE,
     SELENIUM_PROCESSING,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
-    assert_grid_ready,
+    max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
     stop_managed_nodes,
@@ -78,8 +80,8 @@ HEADER_SCAN_ROWS = 10
 # Each worker uses its own DB connection; web scraping stays single-threaded in scrape modules.
 DB_PREFETCH_WORKERS = 8
 
-# Web scraping: True = parallel sessions on Docker Selenium Grid; False = one local Chrome.
-# Default comes from .env (SELENIUM_PROCESSING); set True here to override without editing .env.
+# Web scraping: True = Grid at SELENIUM_REMOTE_URL; False = one local Chrome.
+# Default from .env SELENIUM_MODE=local|grid (legacy: SELENIUM_PROCESSING).
 selenium_processing = SELENIUM_PROCESSING
 
 
@@ -426,18 +428,26 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", 
       - "concat": concatenate chunk result frames (IHMCL scraped output rows)
     """
     if not selenium_processing:
-        print(f"  [{scrape_label}] Running local Chrome (single browser)...", flush=True)
+        print(
+            f"  [{scrape_label}] Running local Chrome "
+            f"(SELENIUM_MODE={SELENIUM_MODE})...",
+            flush=True,
+        )
         return scrape_fn(vehicle_df, None)
 
-    chunks = split_df_for_grid(vehicle_df, MAX_SELENIUM_GRID_NODES)
+    parallel_sessions = max_parallel_sessions()
+    chunks = split_df_for_grid(vehicle_df, parallel_sessions)
     if not chunks:
         return vehicle_df
 
+    sizes = [len(chunk) for chunk in chunks]
     print(
-        f"  [SELENIUM GRID] {scrape_label}: {len(chunks)} chunk(s) -> {SELENIUM_REMOTE_URL} "
-        f"(auto_nodes={SELENIUM_AUTO_MANAGE_NODES})",
+        f"  [SELENIUM GRID] {scrape_label}: mode={SELENIUM_MODE} | "
+        f"{len(chunks)} session chunk(s) (parallel cap {parallel_sessions}) "
+        f"-> {SELENIUM_REMOTE_URL} | auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES}",
         flush=True,
     )
+    print(f"  [SELENIUM GRID] chunk sizes: {sizes}", flush=True)
 
     managed_nodes = []
     merged = None
@@ -445,10 +455,19 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", 
 
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
-            managed_nodes = start_managed_nodes(len(chunks))
-            wait_for_grid_ready(SELENIUM_REMOTE_URL)
+            managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
+            wait_for_grid_ready(
+                SELENIUM_REMOTE_URL,
+                min_nodes=MAX_SELENIUM_GRID_NODES,
+                min_sessions=parallel_sessions,
+            )
         else:
-            assert_grid_ready(SELENIUM_REMOTE_URL)
+            # Hosted / already-running hub (e.g. 192.168.1.200).
+            wait_for_grid_ready(
+                SELENIUM_REMOTE_URL,
+                min_nodes=1,
+                min_sessions=parallel_sessions,
+            )
 
         result_frames = []
         failures = []
@@ -898,9 +917,15 @@ def main():
     print("NHIT VEHICLES PROCESSING AUTOMATION")
     print("="*80)
     print("Program will continuously check for pending files (including IHMCL).")
-    print(
-        f"Web scrape mode: {'Selenium Grid (' + SELENIUM_REMOTE_URL + ')' if selenium_processing else 'local Chrome'}"
-    )
+    if selenium_processing:
+        print(
+            f"Web scrape mode: Selenium Grid ({SELENIUM_REMOTE_URL}) | "
+            f"SELENIUM_MODE={SELENIUM_MODE} | "
+            f"parallel_sessions={SELENIUM_MAX_PARALLEL_SESSIONS} | "
+            f"auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES}"
+        )
+    else:
+        print(f"Web scrape mode: local Chrome (SELENIUM_MODE={SELENIUM_MODE})")
     print("Press Ctrl+C to stop.")
     print("="*80)
     

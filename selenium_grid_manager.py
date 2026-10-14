@@ -268,8 +268,10 @@ def wait_for_grid_ready(
     raise RuntimeError(
         f"Selenium Grid did not reach required capacity within {timeout_seconds}s. "
         f"{last_error}. "
-        f"Check: (1) SELENIUM_HUB_CONTAINER={SELENIUM_HUB_CONTAINER} matches `docker ps`, "
-        f"(2) hub is on network {SELENIUM_NETWORK}, "
-        f"(3) http://localhost:4444/status shows {min_nodes} UP nodes, "
-        f"(4) `docker logs <node-name>` if nodes exit immediately."
+        f"Check: (1) SELENIUM_REMOTE_URL={SELENIUM_REMOTE_URL} is reachable, "
+        f"(2) /status shows >= {min_nodes} UP node(s) and "
+        f">= {min_sessions} session slot(s), "
+        f"(3) for auto-managed local nodes: hub '{SELENIUM_HUB_CONTAINER}' "
+        f"on network '{SELENIUM_NETWORK}', "
+        f"(4) for hosted Grid set SELENIUM_AUTO_MANAGE_NODES=false."
     )

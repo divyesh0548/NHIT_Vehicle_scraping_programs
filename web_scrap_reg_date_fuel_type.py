@@ -8,12 +8,13 @@ Extracted fields from the Kerala tax collection page:
     1. Registration Date  -> input id "cal_regn_dt_input"
     2. Fuel               -> PrimeFaces selectOneMenu field labeled "Fuel"
 
-Selenium mode:
-    USE_SELENIUM_GRID defaults to config.SELENIUM_PROCESSING from .env.
-    True  -> Selenium Grid / hub at SELENIUM_REMOTE_URL with parallel chunks.
-            Parallelism = MAX_SELENIUM_GRID_NODES x SE_NODE_MAX_SESSIONS
-            (e.g. 5 nodes x 5 sessions = 25 Chrome browsers).
-    False -> single local Chrome browser.
+Selenium mode (.env):
+    SELENIUM_MODE=local  -> single local Chrome browser.
+    SELENIUM_MODE=grid   -> Selenium Grid at SELENIUM_REMOTE_URL.
+            Parallelism = SELENIUM_MAX_PARALLEL_SESSIONS
+            (or nodes x sessions-per-node if that env is unset).
+    SELENIUM_AUTO_MANAGE_NODES=false for an already-hosted hub
+            (e.g. http://192.168.1.200:4444/wd/hub).
 
 Progress:
     Live-save mode updates the source workbook as each vehicle finishes, so a
@@ -74,14 +75,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from config import (
     MAX_SELENIUM_GRID_NODES,
     REG_DATE_FUEL_EXCEL_PATH,
-    SE_NODE_MAX_SESSIONS,
     SELENIUM_AUTO_MANAGE_NODES,
     SELENIUM_MAX_PARALLEL_SESSIONS,
+    SELENIUM_MODE,
     SELENIUM_PROCESSING,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
-    assert_grid_ready,
     max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
@@ -102,9 +102,9 @@ SERVICE_NAME = "VEHICLE TAX COLLECTION (OTHER STATE)"
 kerala_portal.STATE_NAME = STATE_NAME
 kerala_portal.SERVICE_NAME = SERVICE_NAME
 
-# .env switch:
-#   SELENIUM_PROCESSING=true  -> Selenium Grid / hub
-#   SELENIUM_PROCESSING=false -> normal local Chrome scraping
+# .env switch (SELENIUM_MODE=local|grid; legacy SELENIUM_PROCESSING still works):
+#   grid  -> Selenium Grid / hub at SELENIUM_REMOTE_URL
+#   local -> normal local Chrome scraping
 USE_SELENIUM_GRID = SELENIUM_PROCESSING
 
 REGISTRATION_DATE_COLUMN = "Registration Date"
@@ -1001,9 +1001,9 @@ def _run_grid_scrape(
     Split pending vehicles evenly across Selenium Grid sessions and merge results.
 
     Layout from .env:
-      MAX_SELENIUM_GRID_NODES chrome node containers
-      SE_NODE_MAX_SESSIONS Chrome browsers per node
-      => SELENIUM_MAX_PARALLEL_SESSIONS total parallel scrapers
+      SELENIUM_MAX_PARALLEL_SESSIONS = total Chrome sessions to open
+      When auto-managing nodes locally:
+        MAX_SELENIUM_GRID_NODES x SE_NODE_MAX_SESSIONS containers/slots
 
     Already-filled Registration Date / Fuel rows stay on the base dataframe and
     are not included in chunk work, so partial files get balanced pending loads.
@@ -1029,10 +1029,10 @@ def _run_grid_scrape(
 
     sizes = [len(chunk) for chunk in chunks]
     print(
-        f"  [SELENIUM GRID] {len(pending_df)} pending vehicle(s) split evenly into "
-        f"{len(chunks)} session chunk(s) on "
-        f"{MAX_SELENIUM_GRID_NODES} node(s) x {SE_NODE_MAX_SESSIONS} session(s) "
-        f"(cap {SELENIUM_MAX_PARALLEL_SESSIONS}) -> {remote_url}",
+        f"  [SELENIUM GRID] mode={SELENIUM_MODE} | "
+        f"{len(pending_df)} pending vehicle(s) -> {len(chunks)} session chunk(s) "
+        f"(parallel cap {parallel_sessions}) -> {remote_url} "
+        f"| auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES}",
         flush=True,
     )
     print(
@@ -1049,9 +1049,19 @@ def _run_grid_scrape(
         if SELENIUM_AUTO_MANAGE_NODES:
             # Start node containers only (not one container per session).
             managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
-            wait_for_grid_ready(remote_url)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=MAX_SELENIUM_GRID_NODES,
+                min_sessions=parallel_sessions,
+            )
         else:
-            assert_grid_ready(remote_url)
+            # External / already-running hub (e.g. 192.168.1.200).
+            # Only require enough total session slots; node count may be uneven.
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=1,
+                min_sessions=parallel_sessions,
+            )
 
         result_frames = []
         failures = []
@@ -1173,7 +1183,7 @@ def scrape_kerala_reg_date_fuel(
     use_selenium_grid:
         True  -> Selenium Grid at SELENIUM_REMOTE_URL
         False -> local Chrome
-        None  -> module-level USE_SELENIUM_GRID, sourced from SELENIUM_PROCESSING
+        None  -> SELENIUM_MODE from .env (local|grid)
     remote_url:
         Explicit Grid URL. When set, it forces grid usage.
     progress_dir:
@@ -1195,7 +1205,7 @@ def scrape_kerala_reg_date_fuel(
     print(f"Service: {SERVICE_NAME}")
 
     if not use_grid:
-        print("Web scrape mode: local Chrome (single browser)")
+        print(f"Web scrape mode: local Chrome (SELENIUM_MODE={SELENIUM_MODE})")
         if write_progress_files and progress_dir is None:
             progress_dir = make_progress_dir()
         local_path = (
@@ -1221,9 +1231,9 @@ def scrape_kerala_reg_date_fuel(
 
     print(
         f"Web scrape mode: Selenium Grid "
-        f"({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES}, "
-        f"{MAX_SELENIUM_GRID_NODES} nodes x {SE_NODE_MAX_SESSIONS} sessions "
-        f"= {SELENIUM_MAX_PARALLEL_SESSIONS} parallel)"
+        f"(SELENIUM_MODE={SELENIUM_MODE}, {grid_url}, "
+        f"auto_nodes={SELENIUM_AUTO_MANAGE_NODES}, "
+        f"parallel_sessions={SELENIUM_MAX_PARALLEL_SESSIONS})"
     )
     return _run_grid_scrape(
         df_input,
