@@ -37,6 +37,8 @@ from selenium_grid_manager import (
     stop_managed_nodes,
     wait_for_grid_ready,
 )
+from scrape_result_utils import ensure_scrape_complete
+from web_scrap_for_permit import PERMIT_FIELDS
 
 # Initialize S3 client
 s3_client = boto3.client(
@@ -417,15 +419,26 @@ def parallel_prefetch_vehicle_db_weights(vehicle_df, num_workers=None):
     return df
 
 
-def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", merge_mode="index"):
+def _run_selenium_grid_scrape(
+    vehicle_df,
+    scrape_fn,
+    scrape_label="WEB SCRAPE",
+    merge_mode="index",
+    result_columns=None,
+):
     """
     Try parallel Selenium Grid scrape via scrape_fn(chunk_df, remote_url).
     remote_url=None means local Chrome inside the scraper.
     On grid failure, falls back to local Chrome on full/partial results.
 
+    After sessions finish, rows still empty or Error* are retried (Grid then
+    local). Scrapers should write "no-data" when the portal has no record.
+
     merge_mode:
       - "index": merge chunk columns back onto vehicle_df by row index (weight/rerun flows)
       - "concat": concatenate chunk result frames (IHMCL scraped output rows)
+    result_columns:
+      Detail columns used for completeness checks (index merge only).
     """
     if not selenium_processing:
         print(
@@ -433,7 +446,17 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", 
             f"(SELENIUM_MODE={SELENIUM_MODE})...",
             flush=True,
         )
-        return scrape_fn(vehicle_df, None)
+        result = scrape_fn(vehicle_df, None)
+        if merge_mode == "index" and result_columns:
+            result = ensure_scrape_complete(
+                result,
+                scrape_fn=scrape_fn,
+                result_columns=result_columns,
+                scrape_label=scrape_label,
+                remote_url=None,
+                max_retry_passes=1,
+            )
+        return result
 
     parallel_sessions = max_parallel_sessions()
     chunks = split_df_for_grid(vehicle_df, parallel_sessions)
@@ -528,7 +551,21 @@ def _run_selenium_grid_scrape(vehicle_df, scrape_fn, scrape_label="WEB SCRAPE", 
             df_for_local = vehicle_df
         else:
             df_for_local = merged if merged is not None else vehicle_df
-        return scrape_fn(df_for_local, None)
+        merged = scrape_fn(df_for_local, None)
+
+    if merged is None:
+        merged = vehicle_df
+
+    # Re-scrape vehicles left empty/Error* when sessions crashed mid-run.
+    if merge_mode == "index" and result_columns:
+        merged = ensure_scrape_complete(
+            merged,
+            scrape_fn=scrape_fn,
+            result_columns=result_columns,
+            scrape_label=scrape_label,
+            remote_url=SELENIUM_REMOTE_URL,
+            max_retry_passes=2,
+        )
 
     return merged
 
@@ -561,7 +598,12 @@ def run_vehicle_weight_web_scrape(vehicle_df, skip_db_phases=True):
             chunk, skip_db_phases=skip_db_phases, remote_url=remote_url
         )
 
-    return _run_selenium_grid_scrape(vehicle_df, scrape_chunk, scrape_label="WEIGHT")
+    return _run_selenium_grid_scrape(
+        vehicle_df,
+        scrape_chunk,
+        scrape_label="WEIGHT",
+        result_columns=["Weight"],
+    )
 
 
 def run_rerun_web_scrape(vehicle_df):
@@ -570,7 +612,12 @@ def run_rerun_web_scrape(vehicle_df):
     def scrape_chunk(chunk, remote_url):
         return scrape_vehicle_weights_rerun(chunk, remote_url=remote_url)
 
-    return _run_selenium_grid_scrape(vehicle_df, scrape_chunk, scrape_label="RERUN")
+    return _run_selenium_grid_scrape(
+        vehicle_df,
+        scrape_chunk,
+        scrape_label="RERUN",
+        result_columns=["Weight"],
+    )
 
 
 def get_db_connection():

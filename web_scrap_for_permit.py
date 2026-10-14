@@ -21,15 +21,22 @@ from config import (
     DB_USER,
     MAX_SELENIUM_GRID_NODES,
     SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
+    SELENIUM_MODE,
     SELENIUM_PROCESSING,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
-    assert_grid_ready,
+    max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
     stop_managed_nodes,
     wait_for_grid_ready,
+)
+from scrape_result_utils import (
+    NO_DATA_MARKER,
+    ensure_scrape_complete,
+    is_site_miss_value,
 )
 from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_number
 
@@ -37,12 +44,10 @@ URL = "https://parivahan.gov.in/"
 WAIT_TIME = 30
 ELEMENT_WAIT = 15
 
-# Selenium Grid toggle:
-#   True  -> run browsers on Docker Selenium Grid (SELENIUM_REMOTE_URL from .env)
-#   False -> run a single local Chrome browser
-# An explicit remote_url passed to scrape_vehicle_details_for_permit() always overrides this.
-# Defaults to config SELENIUM_PROCESSING so main and standalone stay consistent.
-# On grid failure it falls back to local Chrome.
+# Selenium Grid toggle (from .env SELENIUM_MODE=local|grid / SELENIUM_PROCESSING):
+#   True  -> Grid at SELENIUM_REMOTE_URL; parallel = SELENIUM_MAX_PARALLEL_SESSIONS
+#   False -> single local Chrome browser
+# Explicit remote_url always overrides. On grid failure falls back to local Chrome.
 USE_SELENIUM_GRID = SELENIUM_PROCESSING
 
 PERMIT_FIELDS = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
@@ -515,9 +520,9 @@ def get_vehicle_details(driver, wait):
         print(f"Error in get_vehicle_details: {e}")
         import traceback
         print(traceback.format_exc())
-        details['Permit Type'] = "none"
-        details['Permit/Authorization No'] = "none"
-        details['Permit Validity'] = "none"
+        details['Permit Type'] = ""
+        details['Permit/Authorization No'] = ""
+        details['Permit Validity'] = ""
     
     return details
 
@@ -584,12 +589,10 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
                         break
                 else:
                     print("[ERROR] Max retries reached")
-                    # Mark all permit columns as "none"
-                    permit_fields = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
-                    for field in permit_fields:
+                    for field in PERMIT_FIELDS:
                         if field not in df.columns:
                             df[field] = ""
-                        df.at[idx, field] = "none"
+                        df.at[idx, field] = "Error - Input Not Found"
                     return driver, wait, False
 
             try:
@@ -654,18 +657,34 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
                 if not popup_appeared and not data_appeared:
                     time.sleep(1)
 
-            # Always try to extract data - popup has been dismissed if it appeared
-            # Extract all vehicle details
             details = get_vehicle_details(driver, wait)
-            
-            # Update dataframe with extracted details
-            for key, value in details.items():
-                if key not in df.columns:
-                    df[key] = ""
-                # Use "none" if value is empty, otherwise use the extracted value
-                df.at[idx, key] = value if value else "none"
-            
-            print(f"[OK] Details extracted: {list(details.keys())}")
+
+            # Popup and empty fields => site has no usable data for this vehicle.
+            filled_any = any(
+                str(details.get(field) or "").strip()
+                and not is_site_miss_value(details.get(field))
+                for field in PERMIT_FIELDS
+            )
+            for field in PERMIT_FIELDS:
+                if field not in df.columns:
+                    df[field] = ""
+                raw = details.get(field, "")
+                if raw and str(raw).strip() and str(raw).strip().lower() not in {
+                    "none",
+                    "n/a",
+                    "na",
+                    "",
+                }:
+                    df.at[idx, field] = str(raw).strip()
+                else:
+                    df.at[idx, field] = NO_DATA_MARKER
+
+            if popup_appeared and not filled_any:
+                print(f"[OK] Marked as {NO_DATA_MARKER} (not present on website)")
+            elif not filled_any:
+                print(f"[OK] Marked as {NO_DATA_MARKER} (no permit fields on page)")
+            else:
+                print(f"[OK] Details extracted: {list(details.keys())}")
             return driver, wait, True
 
         except Exception as e:
@@ -682,19 +701,16 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
                     break
             else:
                 print("[ERROR] Max retries reached")
-                permit_fields = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
-                for field in permit_fields:
+                for field in PERMIT_FIELDS:
                     if field not in df.columns:
                         df[field] = ""
-                    df.at[idx, field] = "none"
+                    df.at[idx, field] = "Error"
                 return driver, wait, False
 
-    # Mark all permit columns as "none" on max retries
-    permit_fields = ['Permit Type', 'Permit/Authorization No', 'Permit Validity']
-    for field in permit_fields:
+    for field in PERMIT_FIELDS:
         if field not in df.columns:
             df[field] = ""
-        df.at[idx, field] = "none"
+        df.at[idx, field] = "Error - Max Retries"
     return driver, wait, False
 
 def scrape_vehicle_details_for_permit(df_input, remote_url=None, use_selenium_grid=None):
@@ -721,10 +737,22 @@ def scrape_vehicle_details_for_permit(df_input, remote_url=None, use_selenium_gr
     print("=" * 80)
 
     if not use_grid:
-        print("Web scrape mode: local Chrome (single browser)")
-        return _scrape_chunk(df_input, None)
+        print(f"Web scrape mode: local Chrome (SELENIUM_MODE={SELENIUM_MODE})")
+        result = _scrape_chunk(df_input, None)
+        return ensure_scrape_complete(
+            result,
+            scrape_fn=_scrape_chunk,
+            result_columns=PERMIT_FIELDS,
+            scrape_label="PERMIT",
+            remote_url=None,
+            max_retry_passes=1,
+        )
 
-    print(f"Web scrape mode: Selenium Grid ({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})")
+    print(
+        f"Web scrape mode: Selenium Grid ({grid_url}, "
+        f"SELENIUM_MODE={SELENIUM_MODE}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES}, "
+        f"parallel_sessions={SELENIUM_MAX_PARALLEL_SESSIONS})"
+    )
     return _run_grid_scrape(df_input, grid_url)
 
 
@@ -739,15 +767,22 @@ def _scrape_chunk(chunk_df, remote_url):
 
 def _run_grid_scrape(df_input, remote_url):
     """
-    Auto-start Chrome nodes (if enabled), split the work across parallel Grid sessions,
-    merge results, and fall back to local Chrome on failure. Mirrors the approach in
-    web_scrape_gujarat_Unladen_weight._run_grid_scrape / main_experimental_threading.
+    Split work across SELENIUM_MAX_PARALLEL_SESSIONS Grid sessions, merge results,
+    and fall back to local Chrome on failure.
     """
-    chunks = split_df_for_grid(df_input, MAX_SELENIUM_GRID_NODES)
+    parallel_sessions = max_parallel_sessions()
+    chunks = split_df_for_grid(df_input, parallel_sessions)
     if not chunks:
         return df_input
 
-    print(f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url}", flush=True)
+    sizes = [len(chunk) for chunk in chunks]
+    print(
+        f"  [SELENIUM GRID] {len(chunks)} session chunk(s) "
+        f"(parallel cap {parallel_sessions}) -> {remote_url} "
+        f"| auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES}",
+        flush=True,
+    )
+    print(f"  [SELENIUM GRID] chunk sizes: {sizes}", flush=True)
 
     managed_nodes = []
     merged = None
@@ -755,10 +790,18 @@ def _run_grid_scrape(df_input, remote_url):
 
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
-            managed_nodes = start_managed_nodes(len(chunks))
-            wait_for_grid_ready(remote_url)
+            managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=MAX_SELENIUM_GRID_NODES,
+                min_sessions=parallel_sessions,
+            )
         else:
-            assert_grid_ready(remote_url)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=1,
+                min_sessions=parallel_sessions,
+            )
 
         result_frames = []
         failures = []
@@ -800,9 +843,20 @@ def _run_grid_scrape(df_input, remote_url):
     if grid_error:
         print(f"  [SELENIUM GRID] falling back to local Chrome... ({grid_error})", flush=True)
         df_for_local = merged if merged is not None else df_input
-        return _scrape_chunk(df_for_local, None)
+        merged = _scrape_chunk(df_for_local, None)
 
-    return merged
+    if merged is None:
+        merged = df_input.copy()
+
+    # Re-scrape vehicles left empty/Error* after failed Grid sessions.
+    return ensure_scrape_complete(
+        merged,
+        scrape_fn=_scrape_chunk,
+        result_columns=PERMIT_FIELDS,
+        scrape_label="PERMIT",
+        remote_url=remote_url,
+        max_retry_passes=2,
+    )
 
 
 def _scrape_vehicle_details_for_permit_impl(df_input):
@@ -842,7 +896,7 @@ def _scrape_vehicle_details_for_permit_impl(df_input):
         )
         for idx in df[invalid_vehicle_mask].index:
             for field in PERMIT_FIELDS:
-                df.at[idx, field] = "none"
+                df.at[idx, field] = NO_DATA_MARKER
 
     # Start browser (local or grid session via _thread_remote_url)
     driver = setup_driver()
@@ -895,7 +949,16 @@ def _scrape_vehicle_details_for_permit_impl(df_input):
             for field in PERMIT_FIELDS:
                 if field not in df.columns:
                     df[field] = ""
-                df.at[idx, field] = "none"
+                df.at[idx, field] = NO_DATA_MARKER
+            continue
+
+        # Skip rows already complete (resume / retry subset).
+        if all(
+            str(df.at[idx, field]).strip()
+            and not str(df.at[idx, field]).strip().lower().startswith("error")
+            for field in PERMIT_FIELDS
+            if field in df.columns
+        ):
             continue
 
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)

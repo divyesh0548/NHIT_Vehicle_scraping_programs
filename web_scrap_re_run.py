@@ -152,6 +152,8 @@ def _scrape_vehicle_weights_rerun_impl(df_input):
 
     invalid_weight_values = {
         "N/A",
+        "no-data",
+        "none",
         "Error",
         "Error - Input Not Found",
         "Error - Browser Restart Failed",
@@ -165,7 +167,16 @@ def _scrape_vehicle_weights_rerun_impl(df_input):
     for idx, row in df.iterrows():
         vehicle_no = normalize_vehicle_number(row[veh_col])
         if not vehicle_no or not is_vehicle_number_eligible(vehicle_no):
-            df.at[idx, "Weight"] = "N/A"
+            df.at[idx, "Weight"] = "no-data"
+            continue
+
+        # Skip already-complete rows (resume / post-grid retry subset).
+        existing = str(df.at[idx, "Weight"]).strip()
+        if (
+            existing
+            and not existing.lower().startswith("error")
+            and existing not in {"", "nan", "0"}
+        ):
             continue
 
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)

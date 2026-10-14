@@ -49,16 +49,18 @@ from config import (
     DB_USER,
     MAX_SELENIUM_GRID_NODES,
     SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
-    assert_grid_ready,
+    max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
     stop_managed_nodes,
     wait_for_grid_ready,
 )
 from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_number
+from scrape_result_utils import NO_DATA_MARKER, ensure_scrape_complete
 
 URL = "https://parivahan.gov.in/"
 WAIT_TIME = 30
@@ -92,6 +94,8 @@ ORIG_INDEX_COLUMN = "_orig_index"
 INVALID_WEIGHT_VALUES = {
     "",
     "N/A",
+    NO_DATA_MARKER,
+    "no-data",
     "Error",
     "Error - Input Not Found",
     "Error - Browser Restart Failed",
@@ -997,11 +1001,12 @@ def _set_details(df, idx, details):
 
 
 def _na_details():
+    """Site miss: vehicle looked up but no usable data on the portal."""
     return {
-        GROSS_WEIGHT_COLUMN: "N/A",
-        UNLADEN_WEIGHT_COLUMN: "N/A",
-        VEHICLE_TYPE_COLUMN: "N/A",
-        VEHICLE_CLASS_COLUMN: "N/A",
+        GROSS_WEIGHT_COLUMN: NO_DATA_MARKER,
+        UNLADEN_WEIGHT_COLUMN: NO_DATA_MARKER,
+        VEHICLE_TYPE_COLUMN: NO_DATA_MARKER,
+        VEHICLE_CLASS_COLUMN: NO_DATA_MARKER,
     }
 
 
@@ -1198,7 +1203,7 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
 
             if popup_appeared and not data_appeared:
                 _set_details(df, idx, _na_details())
-                print("[OK] Marked as N/A (popup only, no usable details)")
+                print(f"[OK] Marked as {NO_DATA_MARKER} (popup only, no usable details)")
                 return driver, wait, True
 
             # Soft retry on same browser — do NOT full-restart here (that caused
@@ -1213,7 +1218,7 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
 
             _set_details(df, idx, _na_details())
             print(
-                f"[OK] Marked as N/A for {vehicle_no} "
+                f"[OK] Marked as {NO_DATA_MARKER} for {vehicle_no} "
                 f"(no details after {max_retries + 1} attempts)"
             )
             return driver, wait, True
@@ -1379,7 +1384,15 @@ def scrape_kerala_checkpost(
         if progress_dir is None:
             progress_dir = make_progress_dir()
         local_path = chunk_progress_path(progress_dir, 1)
-        return _scrape_chunk(df_input, None, chunk_id=1, progress_path=local_path)
+        result = _scrape_chunk(df_input, None, chunk_id=1, progress_path=local_path)
+        return ensure_scrape_complete(
+            result,
+            scrape_fn=_kerala_retry_scrape,
+            result_columns=DETAIL_COLUMNS,
+            scrape_label="KERALA",
+            remote_url=None,
+            max_retry_passes=1,
+        )
 
     if progress_dir is None:
         progress_dir = make_progress_dir()
@@ -1392,6 +1405,11 @@ def scrape_kerala_checkpost(
         f"({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})"
     )
     return _run_grid_scrape(df_input, grid_url, progress_dir=progress_dir)
+
+
+def _kerala_retry_scrape(chunk_df, remote_url):
+    """Wrapper for ensure_scrape_complete (chunk_df, remote_url) signature."""
+    return _scrape_chunk(chunk_df, remote_url, chunk_id=90, progress_path=None)
 
 
 def _scrape_chunk(chunk_df, remote_url, chunk_id=None, progress_path=None):
@@ -1410,10 +1428,11 @@ def _scrape_chunk(chunk_df, remote_url, chunk_id=None, progress_path=None):
 
 def _run_grid_scrape(df_input, remote_url, progress_dir=None):
     """
-    Split work across Grid nodes; each node writes its own chunk_XX.xlsx.
-    Merge all chunk files at the end (and on failure) so progress is not lost.
+    Split work across SELENIUM_MAX_PARALLEL_SESSIONS Grid sessions;
+    each session writes its own chunk_XX.xlsx. Merge at the end (and on failure).
     """
-    chunks = split_df_for_grid(df_input, MAX_SELENIUM_GRID_NODES)
+    parallel_sessions = max_parallel_sessions()
+    chunks = split_df_for_grid(df_input, parallel_sessions)
     if not chunks:
         return df_input
 
@@ -1422,11 +1441,15 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
     else:
         Path(progress_dir).mkdir(parents=True, exist_ok=True)
 
+    sizes = [len(chunk) for chunk in chunks]
     print(
-        f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url} "
+        f"  [SELENIUM GRID] {len(chunks)} session chunk(s) "
+        f"(parallel cap {parallel_sessions}) -> {remote_url} "
+        f"| auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES} "
         f"| progress_dir={progress_dir}",
         flush=True,
     )
+    print(f"  [SELENIUM GRID] chunk sizes: {sizes}", flush=True)
 
     managed_nodes = []
     merged = None
@@ -1434,10 +1457,18 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
 
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
-            managed_nodes = start_managed_nodes(len(chunks))
-            wait_for_grid_ready(remote_url)
+            managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=MAX_SELENIUM_GRID_NODES,
+                min_sessions=parallel_sessions,
+            )
         else:
-            assert_grid_ready(remote_url)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=1,
+                min_sessions=parallel_sessions,
+            )
 
         result_frames = []
         failures = []
@@ -1507,16 +1538,27 @@ def _run_grid_scrape(df_input, remote_url, progress_dir=None):
             flush=True,
         )
         local_path = chunk_progress_path(progress_dir, 99)
-        return _scrape_chunk(df_input, None, chunk_id=99, progress_path=local_path)
+        merged = _scrape_chunk(df_input, None, chunk_id=99, progress_path=local_path)
 
     if grid_error and merged is not None:
         print(
             f"  [SELENIUM GRID] partial progress kept from {progress_dir} "
-            f"(skipped full local fallback because chunk files exist)",
+            f"(incomplete rows will be retried below)",
             flush=True,
         )
 
-    return merged if merged is not None else df_input
+    if merged is None:
+        merged = df_input.copy()
+
+    # Re-scrape vehicles left empty/Error* after failed Grid sessions.
+    return ensure_scrape_complete(
+        merged,
+        scrape_fn=_kerala_retry_scrape,
+        result_columns=DETAIL_COLUMNS,
+        scrape_label="KERALA",
+        remote_url=remote_url,
+        max_retry_passes=2,
+    )
 
 
 def find_vehicle_reg_column(df):
@@ -1549,12 +1591,15 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
             df[col] = ""
 
     df[veh_col] = df[veh_col].apply(normalize_vehicle_number)
-    invalid_vehicle_count = int((~df[veh_col].apply(is_vehicle_number_eligible)).sum())
+    invalid_vehicle_mask = ~df[veh_col].apply(is_vehicle_number_eligible)
+    invalid_vehicle_count = int(invalid_vehicle_mask.sum())
     if invalid_vehicle_count:
         print(
             f"[INFO] Skipping {invalid_vehicle_count} vehicle numbers outside eligible "
             f"length range (allowed lengths: 8, 9, 10)"
         )
+        for idx in df[invalid_vehicle_mask].index:
+            _set_details(df, idx, _na_details())
 
     print(f"Total vehicles to process: {len(df)}")
     if len(df) == 0:
@@ -1562,9 +1607,17 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
         save_chunk_progress(df, progress_path)
         return df
 
-    # No checkpostmaster lookup — scrape every eligible vehicle
+    # No checkpostmaster lookup — scrape every eligible incomplete vehicle
+    def _needs_scrape(idx):
+        return not all(
+            str(df.at[idx, col]).strip()
+            and not str(df.at[idx, col]).strip().lower().startswith("error")
+            for col in DETAIL_COLUMNS
+        )
+
     valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
-    remaining_df = df[valid_mask]
+    remaining_idx = [idx for idx in df[valid_mask].index if _needs_scrape(idx)]
+    remaining_df = df.loc[remaining_idx]
     remaining_count = len(remaining_df)
 
     print("\n" + "=" * 80)

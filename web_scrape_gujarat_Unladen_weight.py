@@ -32,15 +32,17 @@ from vehicle_number_utils import is_vehicle_number_eligible, normalize_vehicle_n
 from config import (
     MAX_SELENIUM_GRID_NODES,
     SELENIUM_AUTO_MANAGE_NODES,
+    SELENIUM_MAX_PARALLEL_SESSIONS,
     SELENIUM_REMOTE_URL,
 )
 from selenium_grid_manager import (
-    assert_grid_ready,
+    max_parallel_sessions,
     split_dataframe as split_df_for_grid,
     start_managed_nodes,
     stop_managed_nodes,
     wait_for_grid_ready,
 )
+from scrape_result_utils import NO_DATA_MARKER, ensure_scrape_complete
 
 URL = "https://parivahan.gov.in/"
 WAIT_TIME = 30
@@ -51,9 +53,8 @@ ELEMENT_WAIT = 15
 #   False -> run a single local Chrome browser
 # An explicit remote_url passed to scrape_gujarat_weights() always overrides this.
 #
-# When grid is used, Chrome nodes are auto-started (SELENIUM_AUTO_MANAGE_NODES) and the
-# work is split across up to MAX_SELENIUM_GRID_NODES parallel sessions, matching how
-# main_experimental_threading.py handles the grid. On grid failure it falls back to local Chrome.
+# When grid is used, work is split across SELENIUM_MAX_PARALLEL_SESSIONS sessions.
+# On grid failure it falls back to local Chrome.
 USE_SELENIUM_GRID = True
 
 # Output column names for the two weights
@@ -564,14 +565,27 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
             if popup_appeared:
                 ok_button_xpath = "//div[contains(@class,'ui-dialog')]//button[.//span[contains(text(),'OK') or contains(text(),'Ok')]]"
                 safe_click(driver, wait, ok_button_xpath, "OK button on popup")
-                _set_weights(df, idx, "N/A", "N/A")
-                print("[OK] Marked as N/A (no data available)")
+                _set_weights(df, idx, "no-data", "no-data")
+                print("[OK] Marked as no-data (not present on website)")
                 return driver, wait, True
 
             elif data_appeared:
                 gross_weight, unladen_weight = get_vehicle_weights(driver)
-                _set_weights(df, idx, gross_weight, unladen_weight)
-                print(f"[OK] Weights extracted — Gross: {gross_weight}, Unladen: {unladen_weight}")
+                g = str(gross_weight or "").strip()
+                u = str(unladen_weight or "").strip()
+                if (not g or g in {"0", "none", "None"}) and (
+                    not u or u in {"0", "none", "None"}
+                ):
+                    _set_weights(df, idx, NO_DATA_MARKER, NO_DATA_MARKER)
+                    print("[OK] Marked as no-data (page loaded but no weights on website)")
+                else:
+                    _set_weights(
+                        df,
+                        idx,
+                        g if g and g not in {"0", "none"} else NO_DATA_MARKER,
+                        u if u and u not in {"0", "none"} else NO_DATA_MARKER,
+                    )
+                    print(f"[OK] Weights extracted — Gross: {g}, Unladen: {u}")
                 return driver, wait, True
 
             else:
@@ -634,7 +648,15 @@ def scrape_gujarat_weights(df_input, remote_url=None, use_selenium_grid=None):
 
     if not use_grid:
         print("Web scrape mode: local Chrome (single browser)")
-        return _scrape_chunk(df_input, None)
+        result = _scrape_chunk(df_input, None)
+        return ensure_scrape_complete(
+            result,
+            scrape_fn=_scrape_chunk,
+            result_columns=[GROSS_WEIGHT_COLUMN, UNLADEN_WEIGHT_COLUMN],
+            scrape_label="GUJARAT",
+            remote_url=None,
+            max_retry_passes=1,
+        )
 
     print(f"Web scrape mode: Selenium Grid ({grid_url}, auto_nodes={SELENIUM_AUTO_MANAGE_NODES})")
     return _run_grid_scrape(df_input, grid_url)
@@ -651,15 +673,22 @@ def _scrape_chunk(chunk_df, remote_url):
 
 def _run_grid_scrape(df_input, remote_url):
     """
-    Auto-start Chrome nodes (if enabled), split the work across parallel Grid sessions,
-    merge results, and fall back to local Chrome on failure. Mirrors the approach in
-    main_experimental_threading._run_selenium_grid_scrape.
+    Split work across SELENIUM_MAX_PARALLEL_SESSIONS Grid sessions,
+    merge results, and fall back to local Chrome on failure.
     """
-    chunks = split_df_for_grid(df_input, MAX_SELENIUM_GRID_NODES)
+    parallel_sessions = max_parallel_sessions()
+    chunks = split_df_for_grid(df_input, parallel_sessions)
     if not chunks:
         return df_input
 
-    print(f"  [SELENIUM GRID] {len(chunks)} chunk(s) -> {remote_url}", flush=True)
+    sizes = [len(chunk) for chunk in chunks]
+    print(
+        f"  [SELENIUM GRID] {len(chunks)} session chunk(s) "
+        f"(parallel cap {parallel_sessions}) -> {remote_url} "
+        f"| auto_manage_nodes={SELENIUM_AUTO_MANAGE_NODES}",
+        flush=True,
+    )
+    print(f"  [SELENIUM GRID] chunk sizes: {sizes}", flush=True)
 
     managed_nodes = []
     merged = None
@@ -667,10 +696,18 @@ def _run_grid_scrape(df_input, remote_url):
 
     try:
         if SELENIUM_AUTO_MANAGE_NODES:
-            managed_nodes = start_managed_nodes(len(chunks))
-            wait_for_grid_ready(remote_url)
+            managed_nodes = start_managed_nodes(MAX_SELENIUM_GRID_NODES)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=MAX_SELENIUM_GRID_NODES,
+                min_sessions=parallel_sessions,
+            )
         else:
-            assert_grid_ready(remote_url)
+            wait_for_grid_ready(
+                remote_url,
+                min_nodes=1,
+                min_sessions=parallel_sessions,
+            )
 
         result_frames = []
         failures = []
@@ -712,9 +749,19 @@ def _run_grid_scrape(df_input, remote_url):
     if grid_error:
         print(f"  [SELENIUM GRID] falling back to local Chrome... ({grid_error})", flush=True)
         df_for_local = merged if merged is not None else df_input
-        return _scrape_chunk(df_for_local, None)
+        merged = _scrape_chunk(df_for_local, None)
 
-    return merged
+    if merged is None:
+        merged = df_input.copy()
+
+    return ensure_scrape_complete(
+        merged,
+        scrape_fn=_scrape_chunk,
+        result_columns=[GROSS_WEIGHT_COLUMN, UNLADEN_WEIGHT_COLUMN],
+        scrape_label="GUJARAT",
+        remote_url=remote_url,
+        max_retry_passes=2,
+    )
 
 
 def _scrape_gujarat_weights_impl(df_input):
@@ -744,21 +791,34 @@ def _scrape_gujarat_weights_impl(df_input):
         df[UNLADEN_WEIGHT_COLUMN] = ""
 
     df[veh_col] = df[veh_col].apply(normalize_vehicle_number)
-    invalid_vehicle_count = int((~df[veh_col].apply(is_vehicle_number_eligible)).sum())
+    invalid_vehicle_mask = ~df[veh_col].apply(is_vehicle_number_eligible)
+    invalid_vehicle_count = int(invalid_vehicle_mask.sum())
     if invalid_vehicle_count:
         print(
             f"[INFO] Skipping {invalid_vehicle_count} vehicle numbers outside eligible length range "
             f"(allowed lengths: 8, 9, 10)"
         )
+        for idx in df[invalid_vehicle_mask].index:
+            _set_weights(df, idx, NO_DATA_MARKER, NO_DATA_MARKER)
 
     print(f"Total vehicles to process: {len(df)}")
     if len(df) == 0:
         print("No vehicles to process.")
         return df
 
-    # Only scrape valid vehicle numbers
+    # Only scrape valid incomplete vehicle numbers
+    def _needs_scrape(idx):
+        g = str(df.at[idx, GROSS_WEIGHT_COLUMN]).strip() if GROSS_WEIGHT_COLUMN in df.columns else ""
+        u = str(df.at[idx, UNLADEN_WEIGHT_COLUMN]).strip() if UNLADEN_WEIGHT_COLUMN in df.columns else ""
+        if not g or not u:
+            return True
+        if g.lower().startswith("error") or u.lower().startswith("error"):
+            return True
+        return False
+
     valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
-    remaining_df = df[valid_mask]
+    remaining_idx = [idx for idx in df[valid_mask].index if _needs_scrape(idx)]
+    remaining_df = df.loc[remaining_idx]
     remaining_count = len(remaining_df)
 
     print("\n" + "=" * 80)
@@ -813,6 +873,18 @@ def _scrape_gujarat_weights_impl(df_input):
     for idx, row in remaining_df.iterrows():
         vehicle_no = normalize_vehicle_number(row[veh_col])
         if not vehicle_no or not is_vehicle_number_eligible(vehicle_no):
+            _set_weights(df, idx, NO_DATA_MARKER, NO_DATA_MARKER)
+            continue
+
+        # Skip rows already complete (resume / post-grid retry subset).
+        existing_g = str(df.at[idx, GROSS_WEIGHT_COLUMN]).strip() if GROSS_WEIGHT_COLUMN in df.columns else ""
+        existing_u = str(df.at[idx, UNLADEN_WEIGHT_COLUMN]).strip() if UNLADEN_WEIGHT_COLUMN in df.columns else ""
+        if (
+            existing_g
+            and existing_u
+            and not existing_g.lower().startswith("error")
+            and not existing_u.lower().startswith("error")
+        ):
             continue
 
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)

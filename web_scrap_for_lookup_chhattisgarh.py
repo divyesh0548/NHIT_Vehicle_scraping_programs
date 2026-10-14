@@ -646,14 +646,19 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
             if popup_appeared:
                 ok_button_xpath = "//div[contains(@class,'ui-dialog')]//button[.//span[contains(text(),'OK') or contains(text(),'Ok')]]"
                 safe_click(driver, wait, ok_button_xpath, "OK button on popup")
-                df.at[idx, "Weight"] = "N/A"
-                print("[OK] Marked as N/A (no data available)")
+                df.at[idx, "Weight"] = "no-data"
+                print("[OK] Marked as no-data (not present on website)")
                 return driver, wait, True
 
             elif data_appeared:
                 weight = get_vehicle_weight(driver)
-                df.at[idx, "Weight"] = weight
-                print(f"[OK] Weight extracted: {weight}")
+                weight_text = str(weight or "").strip()
+                if not weight_text or weight_text in {"0", "none", "None"}:
+                    df.at[idx, "Weight"] = "no-data"
+                    print("[OK] Marked as no-data (page loaded but no weight on website)")
+                else:
+                    df.at[idx, "Weight"] = weight_text
+                    print(f"[OK] Weight extracted: {weight_text}")
                 return driver, wait, True
 
             else:
@@ -757,6 +762,8 @@ def _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases=False):
             f"[INFO] Skipping {invalid_vehicle_count} vehicle numbers outside eligible length range "
             f"after cleanup (allowed lengths: 8, 9, 10)"
         )
+        for idx in df[invalid_vehicle_mask].index:
+            df.at[idx, "Weight"] = "no-data"
 
     print(f"Total vehicles to process: {len(df)}")
 
@@ -840,11 +847,16 @@ def _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases=False):
         print(f"Found {capacity_total} vehicles in capacity_vehicle_numbers table (pre-filled)")
 
     # STEP 3: Web scrape remaining vehicles (those without weight; excludes capacity "-")
+    # Empty and Error* need scraping; no-data / N/A / - are finished site-miss results.
     def is_empty_weight(weight):
         if pd.isna(weight):
             return True
         weight_str = str(weight).strip()
-        return weight_str == "" or weight_str == "nan"
+        if not weight_str or weight_str.lower() == "nan":
+            return True
+        if weight_str.lower().startswith("error"):
+            return True
+        return False
     
     # Filter vehicles that need scraping (empty weight)
     remaining_mask = df["Weight"].apply(is_empty_weight)
@@ -940,8 +952,16 @@ def _scrape_vehicle_weights_chhattisgarh_impl(df_input, skip_db_phases=False):
                 scraped_count += 1
 
                 # Store in database if weight is valid
-                if weight and weight not in ["N/A", "Error", "Error - Input Not Found",
-                                             "Error - Browser Restart Failed", "Error - Max Retries", "-"]:
+                if weight and weight not in [
+                    "N/A",
+                    "no-data",
+                    "none",
+                    "Error",
+                    "Error - Input Not Found",
+                    "Error - Browser Restart Failed",
+                    "Error - Max Retries",
+                    "-",
+                ]:
                     try:
                         # Check and restore connection if needed
                         conn = check_and_restore_db_connection(conn)
