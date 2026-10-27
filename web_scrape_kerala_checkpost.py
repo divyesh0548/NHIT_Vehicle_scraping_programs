@@ -47,6 +47,7 @@ from config import (
     DB_PASSWORD,
     DB_PORT,
     DB_USER,
+    KERALA_CHECKPOST_EXCEL_PATH,
     MAX_SELENIUM_GRID_NODES,
     SELENIUM_AUTO_MANAGE_NODES,
     SELENIUM_MAX_PARALLEL_SESSIONS,
@@ -1010,6 +1011,53 @@ def _na_details():
     }
 
 
+# Placeholders written when a field did not load. These rows are still pending.
+_PENDING_PLACEHOLDERS = {"", "0", "none", "nan", "n/a", "na", "-", "null"}
+
+
+def _detail_cell_pending(value):
+    """True when this detail cell still needs a scrape (blank, placeholder, or Error*)."""
+    if value is None:
+        return True
+    try:
+        if value != value:  # NaN
+            return True
+    except Exception:
+        pass
+    text = str(value).strip()
+    if not text or text.lower() in _PENDING_PLACEHOLDERS:
+        return True
+    if text.lower().startswith("error"):
+        return True
+    return False
+
+
+def _row_needs_scrape(df, idx):
+    return any(
+        _detail_cell_pending(df.at[idx, col] if col in df.columns else "")
+        for col in DETAIL_COLUMNS
+    )
+
+
+def pending_vehicle_indexes(df):
+    """Row labels that do not yet have a finished result (real data or no-data)."""
+    if df is None or df.empty:
+        return []
+    return [idx for idx in df.index if _row_needs_scrape(df, idx)]
+
+
+def _fill_missing_with_no_data(details):
+    """Keep scraped values; write no-data for any field the page did not provide."""
+    filled = {}
+    for col in DETAIL_COLUMNS:
+        text = str(details.get(col, "") or "").strip()
+        if not text or text.lower() in _PENDING_PLACEHOLDERS:
+            filled[col] = NO_DATA_MARKER
+        else:
+            filled[col] = text
+    return filled
+
+
 def _error_details(message):
     return {
         GROSS_WEIGHT_COLUMN: message,
@@ -1196,7 +1244,7 @@ def process_single_vehicle(driver, wait, vehicle_no, idx, df):
             if data_appeared:
                 details = get_vehicle_details(driver)
                 if _details_look_populated(details):
-                    _set_details(df, idx, details)
+                    _set_details(df, idx, _fill_missing_with_no_data(details))
                     print(f"[OK] Details extracted for {vehicle_no}")
                     return driver, wait, True
                 print("[WARNING] Details signal present but extracted values were empty")
@@ -1595,8 +1643,8 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
     invalid_vehicle_count = int(invalid_vehicle_mask.sum())
     if invalid_vehicle_count:
         print(
-            f"[INFO] Skipping {invalid_vehicle_count} vehicle numbers outside eligible "
-            f"length range (allowed lengths: 8, 9, 10)"
+            f"[INFO] Marked {invalid_vehicle_count} vehicle number(s) as {NO_DATA_MARKER} "
+            f"(outside eligible length range 8, 9, 10)"
         )
         for idx in df[invalid_vehicle_mask].index:
             _set_details(df, idx, _na_details())
@@ -1607,16 +1655,11 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
         save_chunk_progress(df, progress_path)
         return df
 
-    # No checkpostmaster lookup — scrape every eligible incomplete vehicle
-    def _needs_scrape(idx):
-        return not all(
-            str(df.at[idx, col]).strip()
-            and not str(df.at[idx, col]).strip().lower().startswith("error")
-            for col in DETAIL_COLUMNS
-        )
-
+    # No checkpostmaster lookup — scrape every eligible vehicle that is still pending.
+    # Finished rows (real values or no-data) are left as-is so a file recheck
+    # only revisits blank / placeholder / Error* vehicles.
     valid_mask = df[veh_col].apply(is_vehicle_number_eligible)
-    remaining_idx = [idx for idx in df[valid_mask].index if _needs_scrape(idx)]
+    remaining_idx = [idx for idx in df[valid_mask].index if _row_needs_scrape(df, idx)]
     remaining_df = df.loc[remaining_idx]
     remaining_count = len(remaining_df)
 
@@ -1693,6 +1736,8 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
     for idx, row in remaining_df.iterrows():
         vehicle_no = normalize_vehicle_number(row[veh_col])
         if not vehicle_no or not is_vehicle_number_eligible(vehicle_no):
+            _set_details(df, idx, _na_details())
+            save_chunk_progress(df, progress_path)
             continue
 
         driver, wait, success = process_single_vehicle(driver, wait, vehicle_no, idx, df)
@@ -1779,47 +1824,130 @@ def _scrape_kerala_checkpost_impl(df_input, progress_path=None):
     return df
 
 
-if __name__ == "__main__":
-    EXCEL_PATH = "kerala checkpost run.xlsx"
-
-    progress_dir = make_progress_dir(EXCEL_PATH)
-
-    with pd.ExcelFile(EXCEL_PATH) as xls:
-        sheets_dict = {
+def _load_workbook(path):
+    with pd.ExcelFile(path) as xls:
+        return {
             sheet: pd.read_excel(xls, sheet_name=sheet, dtype=str)
             for sheet in xls.sheet_names
         }
 
-    scraped_any = False
-    for sheet_name, df_sheet in sheets_dict.items():
-        veh_col = find_vehicle_reg_column(df_sheet)
-        if veh_col is None:
-            print(
-                f"[SKIP] Sheet '{sheet_name}': no vehicle registration header keyword found "
-                f"(columns: {list(df_sheet.columns)})"
-            )
+
+def _save_workbook(path, sheets_dict):
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for sheet, data in sheets_dict.items():
+            data.to_excel(writer, sheet_name=sheet, index=False)
+
+
+def _workbook_pending_count(sheets_dict):
+    total = 0
+    for df_sheet in sheets_dict.values():
+        if find_vehicle_reg_column(df_sheet) is None:
             continue
+        total += len(pending_vehicle_indexes(df_sheet))
+    return total
 
-        print(
-            f"[OK] Sheet '{sheet_name}': found vehicle column '{veh_col}' "
-            f"({len(df_sheet)} rows) — starting web scrape"
-        )
-        # Each Grid node writes chunk_XX.xlsx under progress_dir; results are merged after.
-        sheets_dict[sheet_name] = scrape_kerala_checkpost(
-            df_sheet,
-            use_selenium_grid=USE_SELENIUM_GRID,
-            progress_dir=progress_dir,
-        )
-        scraped_any = True
 
-    if not scraped_any:
-        print(
-            "[ERROR] No sheet contained a vehicle registration header keyword "
-            "(looked for columns with 'veh'+'reg' or 'vehicle'). Nothing scraped."
+# After the first scrape, re-open the saved workbook and process leftovers.
+# Session crashes leave blank/Error rows; site misses are already "no-data".
+FILE_RECHECK_PASSES = 1
+
+
+if __name__ == "__main__":
+    EXCEL_PATH = KERALA_CHECKPOST_EXCEL_PATH
+    if not EXCEL_PATH:
+        raise FileNotFoundError(
+            "Input path not set. Set KERALA_CHECKPOST_EXCEL_PATH in .env."
         )
-    else:
-        with pd.ExcelWriter(EXCEL_PATH, engine="openpyxl") as writer:
-            for sheet, data in sheets_dict.items():
-                data.to_excel(writer, sheet_name=sheet, index=False)
+    if not Path(EXCEL_PATH).exists():
+        raise FileNotFoundError(
+            f"Input path not found: {EXCEL_PATH}. "
+            "Set KERALA_CHECKPOST_EXCEL_PATH in .env."
+        )
+
+    sheets_dict = _load_workbook(EXCEL_PATH)
+    scraped_any = False
+    max_passes = 1 + FILE_RECHECK_PASSES
+
+    for pass_num in range(1, max_passes + 1):
+        if pass_num > 1:
+            sheets_dict = _load_workbook(EXCEL_PATH)
+            pending_now = _workbook_pending_count(sheets_dict)
+            print("\n" + "=" * 80)
+            print(
+                f"[FILE CHECK {pass_num}/{max_passes}] Re-opened '{EXCEL_PATH}': "
+                f"{pending_now} vehicle(s) still pending (blank or Error*)"
+            )
+            print("=" * 80)
+            if pending_now == 0:
+                print("[COMPLETE] Every vehicle already has a result (data or no-data).")
+                break
+
+        progress_dir = make_progress_dir(EXCEL_PATH)
+        pass_scraped = False
+
+        for sheet_name, df_sheet in list(sheets_dict.items()):
+            veh_col = find_vehicle_reg_column(df_sheet)
+            if veh_col is None:
+                print(
+                    f"[SKIP] Sheet '{sheet_name}': no vehicle registration header keyword found "
+                    f"(columns: {list(df_sheet.columns)})"
+                )
+                continue
+
+            pending_idx = pending_vehicle_indexes(df_sheet)
+            if not pending_idx:
+                print(
+                    f"[OK] Sheet '{sheet_name}': all {len(df_sheet)} vehicle(s) already have results"
+                )
+                scraped_any = True
+                continue
+
+            print(
+                f"[OK] Sheet '{sheet_name}': found vehicle column '{veh_col}' "
+                f"({len(pending_idx)}/{len(df_sheet)} pending) — starting web scrape"
+            )
+            # Fresh progress folder per pass so an earlier chunk file cannot
+            # overwrite newer results during merge.
+            sheets_dict[sheet_name] = scrape_kerala_checkpost(
+                df_sheet,
+                use_selenium_grid=USE_SELENIUM_GRID,
+                progress_dir=progress_dir,
+            )
+            scraped_any = True
+            pass_scraped = True
+
+        if not scraped_any:
+            print(
+                "[ERROR] No sheet contained a vehicle registration header keyword "
+                "(looked for columns with 'veh'+'reg' or 'vehicle'). Nothing scraped."
+            )
+            break
+
+        if not pass_scraped and pass_num == 1:
+            _save_workbook(EXCEL_PATH, sheets_dict)
+            print(f"[COMPLETE] No pending vehicles. Results saved to '{EXCEL_PATH}'")
+            break
+
+        _save_workbook(EXCEL_PATH, sheets_dict)
         print(f"[OK] Results saved back to '{EXCEL_PATH}'")
         print(f"[OK] Per-node progress files kept in: {progress_dir}")
+
+        sheets_dict = _load_workbook(EXCEL_PATH)
+        still_pending = _workbook_pending_count(sheets_dict)
+        if still_pending == 0:
+            print(
+                f"[COMPLETE] File check: every vehicle in '{EXCEL_PATH}' "
+                f"has data or {NO_DATA_MARKER}."
+            )
+            break
+
+        if pass_num == max_passes:
+            print(
+                f"[WARN] {still_pending} vehicle(s) still pending after the file check "
+                f"(left blank or Error* so the next run will process them)."
+            )
+        else:
+            print(
+                f"[FILE CHECK] {still_pending} vehicle(s) still pending. "
+                f"Scraping those rows next."
+            )

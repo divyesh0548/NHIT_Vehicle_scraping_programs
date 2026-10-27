@@ -82,3 +82,6 @@ else:
 # Kerala Registration Date / Fuel scraper input
 # Single .xlsx workbook or a folder containing .xlsx workbooks
 REG_DATE_FUEL_EXCEL_PATH = (os.getenv("REG_DATE_FUEL_EXCEL_PATH") or "").strip()
+
+# Kerala checkpost scraper input (.xlsx workbook)
+KERALA_CHECKPOST_EXCEL_PATH = (os.getenv("KERALA_CHECKPOST_EXCEL_PATH") or "").strip()
